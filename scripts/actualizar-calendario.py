@@ -251,6 +251,7 @@ def main():
     clave_fh = os.environ.get("FINNHUB_API_KEY", "").strip()
 
     reales, origen = [], "ForexFactory"
+    fallo = ""
     if clave_fmp or clave_fh:
         try:
             if clave_fmp:
@@ -260,25 +261,59 @@ def main():
                 reales = valores_finnhub(clave_fh, desde, hasta)
                 origen = "ForexFactory + Finnhub"
             print("API de valores reales: %d registros descargados." % len(reales))
+            if not reales:
+                fallo = "La API respondio pero sin registros en esas fechas."
         except Exception as err:                      # noqa: BLE001
+            fallo = str(err)
             print("AVISO: fallo la API de valores reales (%s)." % err)
             print("       Se guarda el calendario base; la app seguira funcionando.")
             reales = []
     else:
         print("Sin clave de API configurada: se guarda el calendario base.")
 
+    def limpia(texto):
+        """Quita del mensaje cualquier cosa que parezca una clave."""
+        return re.sub(r"[A-Za-z0-9_\-]{18,}", "***", str(texto))[:200]
+
     puestos = fusiona(base, reales) if reales else 0
     print("Valores reales fusionados: %d de %d eventos." % (puestos, len(base)))
 
+    clave = clave_fmp or clave_fh
     paquete = {
-        "actualizado": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "origen": origen if puestos else "ForexFactory (sin valores reales)",
         "conValoresReales": puestos,
+        "diagnostico": {
+            "claveDetectada": "FMP_API_KEY" if clave_fmp else ("FINNHUB_API_KEY" if clave_fh else "ninguna"),
+            "longitudClave": len(clave),
+            "apiRespondio": bool(reales),
+            "registrosApi": len(reales),
+            "mensaje": limpia(fallo) if fallo else "",
+        },
         "eventos": base,
     }
+
+    # Si nada ha cambiado, se conserva la fecha anterior para no crear un commit cada 10 minutos
+    anterior = {}
+    if os.path.exists(destino):
+        try:
+            with open(destino, encoding="utf-8") as fh:
+                anterior = json.load(fh)
+        except Exception:                             # noqa: BLE001
+            anterior = {}
+    igual = isinstance(anterior, dict) and all(
+        anterior.get(k) == v for k, v in paquete.items()
+    )
+    paquete["actualizado"] = (anterior.get("actualizado") if igual and anterior.get("actualizado")
+                              else datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"))
+
     with open(destino, "w", encoding="utf-8") as fh:
         json.dump(paquete, fh, ensure_ascii=False, separators=(",", ":"))
     print("Escrito %s (%d eventos)." % (destino, len(base)))
+    print("DIAGNOSTICO -> clave: %s | api respondio: %s | registros: %d | mensaje: %s"
+          % (paquete["diagnostico"]["claveDetectada"],
+             paquete["diagnostico"]["apiRespondio"],
+             paquete["diagnostico"]["registrosApi"],
+             paquete["diagnostico"]["mensaje"] or "(ninguno)"))
     return 0
 
 

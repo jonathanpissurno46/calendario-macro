@@ -179,8 +179,30 @@ tbody tr.day-row .cnt{font-weight:600;color:var(--muted);font-size:11.5px;margin
 tbody tr.day-row .rel{float:right;font-weight:600;color:var(--accent2);font-size:11.5px;letter-spacing:0}
 tbody tr.ev{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
 tbody tr.ev:hover{background:var(--row-hover)}
-tbody tr.ev.past{opacity:.62}
-tbody tr.ev.past:hover{opacity:.9}
+/* ---------- PASADO vs PENDIENTE ---------- */
+tbody tr.ev.past{opacity:.38;filter:grayscale(.5)}
+tbody tr.ev.past td{background:color-mix(in srgb,var(--muted) 6%,transparent)}
+tbody tr.ev.past:hover{opacity:.85;filter:grayscale(.15)}
+tbody tr.ev.past .col-val .v{opacity:.95;font-weight:700}
+tbody tr.ev.up td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+tbody tr.ev.up:hover td{background:var(--row-hover)}
+tbody tr.ev.up .col-time .t{color:var(--accent2);font-weight:800}
+
+/* línea de AHORA, entre lo publicado y lo que falta */
+tr.nowline td{
+  background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 26%,var(--panel)) 0%,var(--panel) 85%);
+  border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);
+  padding:7px 12px;font-size:12.5px;font-weight:800;color:var(--accent2);
+}
+tr.nowline .live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);
+  margin-right:8px;vertical-align:middle;animation:ring 2s infinite}
+@keyframes ring{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 65%,transparent)}
+                70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+tr.nowline b{color:var(--text)}
+tr.nowline .sub{float:right;font-weight:600;color:var(--muted);font-size:11.5px}
+tr.nowline .sub b{color:var(--accent2)}
+.col-left .ok{color:var(--muted2);font-weight:600}
+.col-left .cdo{color:var(--accent2);font-weight:800}
 tbody tr.ev.now{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
 tbody tr.ev.hi{box-shadow:inset 3px 0 0 var(--high)}
 tbody tr.ev.now.hi{box-shadow:inset 3px 0 0 var(--accent)}
@@ -233,6 +255,9 @@ td{padding:9px 10px;vertical-align:middle}
 .rxchip.lvn05 i{color:color-mix(in srgb,var(--bad) 70%,var(--muted))}
 .rxchip.lv0 i{color:var(--muted2);letter-spacing:0}
 .rxtext{font-size:12px;color:var(--muted);font-style:italic}
+.rxbtn{border:1px solid var(--border2);background:var(--panel2);color:var(--accent2);border-radius:6px;
+  padding:1px 7px;font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap;margin-left:2px}
+.rxbtn:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,transparent)}
 
 /* matriz del detalle */
 .rxtable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
@@ -516,7 +541,10 @@ tr.detail td{background:var(--panel2);padding:0;border-bottom:1px solid var(--bo
         <span class="k"><span class="box" style="background:var(--low)"></span> Bajo</span>
         <span class="k" style="color:var(--good)">▲ mejor de lo previsto</span>
         <span class="k" style="color:var(--bad)">▼ peor de lo previsto</span>
-        <span class="k">Clic en una fila para ver el detalle, el mapa completo y la fuente</span>
+        <span class="k"><span style="display:inline-block;width:22px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:6px"></span><b>AHORA</b> separa lo publicado de lo pendiente</span>
+        <span class="k" style="opacity:.5">apagado = ya publicado</span>
+        <span class="k" style="color:var(--accent2)">azul = pendiente</span>
+        <span class="k">Clic en una fila para ver el detalle y la fuente</span>
         <span class="k" id="rxlegend" style="color:var(--muted2)">🔮 <b>Según la previsión</b> = lo que <i>puede</i> hacer el precio · ⚡ <b>Ya salió</b> = lo que <i>va a</i> hacer con el dato real · <b>SUBE / BAJA FUERTE</b>, normal o <b>DESPACIO</b> · modelo heurístico, no una predicción</span>
       </div>
       <div class="srcbar" id="srcbar"></div>
@@ -1215,6 +1243,7 @@ function rxStrip(e){
     return `<div class="rxdir live">
       <span class="tag">⚡ ${esc(etq)}</span>
       ${core.map(a=>rxChip(a.k, m[a.k])).join("")}
+      <button class="rxbtn" data-setactual="${esc(evKey(e))}" title="Corregir o borrar el dato introducido">✎</button>
     </div>`;
   }
 
@@ -1229,6 +1258,7 @@ function rxStrip(e){
   return `<div class="rxdir pend">
     <span class="tag">🔮 ${esc(etq)} · puede hacer</span>
     ${core.map(a=>rxChip(a.k, m[a.k])).join("")}
+    <button class="rxbtn" data-setactual="${esc(evKey(e))}" title="Escribe el dato real y la dirección se calcula al instante">✎ dato real</button>
   </div>`;
 }
 
@@ -1468,6 +1498,17 @@ function relativeLabel(ts){
   return diff >= 0 ? "en "+s : "hace "+s;
 }
 
+/* Línea divisoria que marca el momento actual dentro de la tabla. */
+function nowLineHTML(){
+  const ahora = new Date();
+  const prox = allEvents().filter(x=>!x.allDay && x._ts > Date.now()).sort((a,b)=>a._ts-b._ts)[0];
+  const cuenta = prox
+    ? `Próximo: ${CUR[prox.c]?CUR[prox.c].f+" ":""}<b>${esc(prox.n)}</b> en <b>${leftText(prox._ts)}</b>`
+    : "No quedan eventos pendientes";
+  return `<tr class="nowline"><td colspan="8"><span class="live-dot"></span>AHORA · ${hm(ahora)}`
+       + `<span class="sub">${cuenta}</span></td></tr>`;
+}
+
 function leftText(ts){
   const d = ts - Date.now();
   if(d < -3600000) return "publicado";
@@ -1484,10 +1525,15 @@ function render(){
 
   const now = Date.now();
 
+  let lineaPuesta = false;
+  let huboPasados = false;
+  const esPasado = e => !e.allDay && e._ts < now - 60000;
+
   if(state.groupDays){
     let cur = null, frag = "";
-    // Para el toggle "solo pendientes" mostramos también el día en curso completo
     for(const e of list){
+      if(!lineaPuesta && huboPasados && !esPasado(e) && !e.allDay){ frag += nowLineHTML(); lineaPuesta = true; }
+      if(esPasado(e)) huboPasados = true;
       const key = dk(new Date(e._ts));
       if(key !== cur){
         if(frag) tbody.insertAdjacentHTML("beforeend", frag);
@@ -1495,13 +1541,22 @@ function render(){
         const dayEvents = list.filter(x=>dk(new Date(x._ts))===key);
         const hi = dayEvents.filter(x=>x.i===3).length;
         const isToday = key === dk(new Date());
-        frag = `<tr class="day-row"><td colspan="8">${isToday?"📍 ":""}${esc(longDay(new Date(e._ts)))}<span class="cnt">${dayEvents.length} evento${dayEvents.length===1?"":"s"}${hi?` · ${hi} de alto impacto`:""}</span><span class="rel">${relativeLabel(dayEvents[0]._ts)}</span></td></tr>`;
+        const np = dayEvents.filter(x=>!x.allDay && x._ts < now).length;
+        const nf = dayEvents.length - np;
+        const desglose = (np && nf) ? ` · <b style="color:var(--accent2)">${np} publicados</b>, ${nf} pendientes` : "";
+        frag = `<tr class="day-row"><td colspan="8">${isToday?"📍 ":""}${esc(longDay(new Date(e._ts)))}<span class="cnt">${dayEvents.length} evento${dayEvents.length===1?"":"s"}${hi?` · ${hi} de alto impacto`:""}${desglose}</span><span class="rel">${relativeLabel(dayEvents[0]._ts)}</span></td></tr>`;
       }
       frag += rowHTML(e, now);
     }
     if(frag) tbody.insertAdjacentHTML("beforeend", frag);
   } else {
-    tbody.innerHTML = list.map(e=>rowHTML(e, now)).join("");
+    let html = "";
+    for(const e of list){
+      if(!lineaPuesta && huboPasados && !esPasado(e) && !e.allDay){ html += nowLineHTML(); lineaPuesta = true; }
+      if(esPasado(e)) huboPasados = true;
+      html += rowHTML(e, now);
+    }
+    tbody.innerHTML = html;
   }
 
   /* si había una fila abierta, se vuelve a abrir en su sitio */
@@ -1523,14 +1578,16 @@ function rowHTML(e, now){
   const past = e._ts < now - 60000;
   const live = !e.allDay && e._ts <= now+60000 && e._ts >= now-15*60000;
   const s = surprise(e);
-  const cls = ["ev", past?"past":"", live?"now":"", e.i===3?"hi":""].filter(Boolean).join(" ");
+  const cls = ["ev", past?"past":"up", live?"now":"", e.i===3?"hi":""].filter(Boolean).join(" ");
   const kind = KIND[e.k]||KIND.data;
   const timeCell = e.allDay
     ? `<span class="t" style="color:var(--muted)">Todo el día</span>`
     : `<span class="t">${hm(new Date(e._ts))}</span><span class="left">${relativeLabel(e._ts)}</span>`;
   const leftCell = e.allDay
     ? `<span style="color:var(--muted2)">—</span>`
-    : `<span class="${!past && e._ts-now < 3600000 ? "soon" : ""}">${leftText(e._ts)}</span>`;
+    : (past
+        ? `<span class="ok">✓ publicado</span>`
+        : `<span class="cdo">${leftText(e._ts)}</span>`);
 
   const val = (v, showSurprise) => {
     if(v===undefined||v===null||v==="") return `<span style="color:var(--muted2)">—</span>`;
@@ -1736,6 +1793,7 @@ function insertarDetalle(tr){
   detalleAbierto = +tr.dataset.id;
 }
 $("#tbody").addEventListener("click", ev=>{
+  if(ev.target.closest("[data-setactual]")) return;   // los botones no abren el detalle
   const tr = ev.target.closest("tr.ev"); if(!tr) return;
   const next = tr.nextElementSibling;
   if(next && next.classList.contains("detail")){ next.remove(); detalleAbierto = null; return; }

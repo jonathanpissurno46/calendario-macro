@@ -411,8 +411,10 @@ tr.detail td{background:var(--panel2);padding:0;border-bottom:1px solid var(--bo
     <div class="tabs" id="tabs">
       <button class="tab" data-range="today">Hoy</button>
       <button class="tab" data-range="tomorrow">Mañana</button>
+      <button class="tab" data-range="lastweek">Sem. pasada</button>
       <button class="tab active" data-range="week">Esta semana</button>
-      <button class="tab" data-range="nextweek">Próxima semana</button>
+      <button class="tab" data-range="nextweek">Próx. semana</button>
+      <button class="tab" data-range="lastmonth">Mes pasado</button>
       <button class="tab" data-range="month">Este mes</button>
       <button class="tab" data-range="all">Todo</button>
     </div>
@@ -1449,10 +1451,21 @@ function rangeBounds(){
       const dow = dowOfKey(dayKeyOffset(0));
       return {a:start(-dow+7), b:start(-dow+14)};
     }
+    case "lastweek": {
+      const dow = dowOfKey(dayKeyOffset(0));
+      return {a:start(-dow-7), b:start(-dow)};
+    }
     case "month": {
       const k = dayKeyOffset(0).split("-").map(Number);
       const from = `${k[0]}-${String(k[1]).padStart(2,"0")}-01`;
       const to = k[1]===12 ? `${k[0]+1}-01-01` : `${k[0]}-${String(k[1]+1).padStart(2,"0")}-01`;
+      return {a: startOfDayKey(from), b: startOfDayKey(to)};
+    }
+    case "lastmonth": {
+      const k = dayKeyOffset(0).split("-").map(Number);
+      const mesAnterior = k[1]===1 ? {y:k[0]-1, m:12} : {y:k[0], m:k[1]-1};
+      const from = `${mesAnterior.y}-${String(mesAnterior.m).padStart(2,"0")}-01`;
+      const to = `${k[0]}-${String(k[1]).padStart(2,"0")}-01`;
       return {a: startOfDayKey(from), b: startOfDayKey(to)};
     }
     default: return {a:null, b:null};
@@ -1722,6 +1735,11 @@ function saveState(){
 $("#tabs").addEventListener("click", ev=>{
   const b = ev.target.closest(".tab"); if(!b) return;
   state.range = b.dataset.range; state.day = null;
+  // Si eliges un periodo ya terminado, se quita "Solo pendientes" para que se vea el historico
+  if(b.dataset.range === "lastweek" || b.dataset.range === "lastmonth"){
+    state.onlyUpcoming = false;
+    $("#onlyup").checked = false;
+  }
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t===b));
   render(); renderMini(); saveState();
 });

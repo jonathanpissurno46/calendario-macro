@@ -332,6 +332,12 @@ tr.detail td{background:var(--panel2);padding:0;border-bottom:1px solid var(--bo
 .legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:10px 13px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
 .legend .k{display:inline-flex;align-items:center;gap:6px}
 .legend .box{width:11px;height:11px;border-radius:3px;display:inline-block}
+.srclive{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.3px;
+  padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);white-space:nowrap}
+.srclive.on{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.srclive.off{color:var(--muted2)}
+.srclive.err{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
 .srcbar{padding:11px 13px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);line-height:1.6}
 .footer{padding:22px 16px 50px;max-width:1680px;margin:0 auto;color:var(--muted2);font-size:12px;line-height:1.7}
 .footer h4{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.7px;margin:0 0 8px}
@@ -460,6 +466,17 @@ tr.detail td{background:var(--panel2);padding:0;border-bottom:1px solid var(--bo
 
       <label class="toggle"><input type="checkbox" id="onlyup" checked>Solo pendientes</label>
       <label class="toggle"><input type="checkbox" id="groupdays" checked>Agrupar por día</label>
+
+      <div class="fgroup">
+        <label>Fuente</label>
+        <select class="tz" id="fuente" style="height:32px;max-width:190px">
+          <option value="auto">Automática (en vivo)</option>
+          <option value="vivo">Sólo datos en vivo</option>
+          <option value="curado">Sólo mi calendario</option>
+        </select>
+        <span class="srclive" id="livechip"><span class="dot"></span> comprobando…</span>
+        <button class="btn" id="refreshlive" title="Volver a descargar los datos">🔄</button>
+      </div>
 
       <div class="fgroup">
         <button class="btn" id="reset">↺ Limpiar</button>
@@ -897,6 +914,7 @@ let state = {
   theme: LS.get("theme","dark"),
   showMap: true,
   rxBase: LS.get("rxBase",1),
+  fuente: LS.get("fuente","auto"),
   day: null,           // día seleccionado en el mini calendario (YYYY-MM-DD)
   month: null          // mes mostrado en el mini calendario (YYYY-MM)
 };
@@ -906,7 +924,7 @@ const EXTRA = () => LS.get("extra",[]).map(e=>({...e, own:true}));
 const evKey = e => e.d + "|" + e.n;
 function allEvents(){
   const A = LS.get("actuals",{});
-  return EVENTS.concat(EXTRA())
+  return baseEvents().concat(EXTRA())
     .map((e,idx)=>{
       const o = {...e, _id: idx, _ts: new Date(e.d).getTime()};
       const k = evKey(e);
@@ -1253,6 +1271,91 @@ function rxDetail(e){
 }
 
 /* ==========================================================================
+   2.c  DATOS EN VIVO
+   Un flujo de trabajo de GitHub descarga cada pocas horas el calendario
+   público y lo deja como `datos.json` en tu propio sitio. Al ser del mismo
+   dominio no hay problema de CORS. Si no existe, se usa el calendario curado.
+   ========================================================================== */
+let LIVE = LS.get("vivo", null);           // { actualizado, origen, eventos:[...] }
+
+function clasificar(title){
+  const t = (title || "").toLowerCase();
+  if(/crude oil inventories|natural gas storage|opec|oil|gasoline/.test(t))            return "Energía";
+  if(/rate decision|interest rate|fomc|monetary policy|press conference|speaks|speech|minutes|testimony|symposium/.test(t)) return "Bancos centrales";
+  if(/unemployment rate|jobless|claims|payroll|employment change|non-farm|nonfarm|adp/.test(t)) return "Empleo";
+  if(/cpi|inflation|ppi|producer price|pce|price index|wage|earnings/.test(t))          return "Inflación";
+  if(/retail sales|consumer confidence|consumer sentiment|personal spending|michigan/.test(t)) return "Consumo";
+  if(/housing|home sales|building permits|construction|mortgage/.test(t))               return "Vivienda";
+  if(/trade balance|current account|exports|imports|balance of trade/.test(t))          return "Comercio";
+  if(/budget|deficit|debt|treasury|fiscal|auction/.test(t))                             return "Fiscal";
+  return "Actividad";
+}
+function mapFF(x){
+  let iso = x.date || "";
+  let allDay = false;
+  if(/T00:00:00/.test(iso)){ iso = iso.slice(0,10) + "T12:00:00Z"; allDay = true; }
+  const imp = String(x.impact || "").toLowerCase();
+  const cb  = /rate decision|speaks|speech|minutes|monetary policy|press conference|testimony/i.test(x.title || "");
+  return {
+    d: iso,
+    c: String(x.country || "USD").toUpperCase(),
+    n: x.title || "(sin título)",
+    i: imp.indexOf("high") === 0 ? 3 : imp.indexOf("med") === 0 ? 2 : 1,
+    k: imp.indexOf("holiday") === 0 ? "holiday" : (cb ? "cb" : "data"),
+    t: clasificar(x.title),
+    a: x.actual || "", f: x.forecast || "", p: x.previous || "",
+    allDay: allDay, live: true
+  };
+}
+async function cargarVivo(silencioso){
+  const chip = document.getElementById("livechip");
+  if(chip && !silencioso){ chip.className = "srclive"; chip.innerHTML = '<span class="dot"></span> descargando…'; }
+  try{
+    const r = await fetch("datos.json?_=" + Date.now(), { cache: "no-store" });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    const arr = Array.isArray(d) ? d : (d.eventos || []);
+    if(!arr.length) throw new Error("sin eventos");
+    LIVE = {
+      actualizado: d.actualizado || r.headers.get("last-modified") || new Date().toISOString(),
+      origen: d.origen || "feed público",
+      eventos: arr.map(mapFF).filter(e=>e.d && e.c)
+    };
+    LS.set("vivo", LIVE);
+    pintarChip(true);
+    if(state.fuente !== "curado"){ render(); renderMini(); }
+    return true;
+  }catch(err){
+    if(!LIVE) LIVE = null;
+    pintarChip(false, err.message);
+    if(state.fuente === "vivo" && !LIVE) render();
+    return false;
+  }
+}
+function pintarChip(ok, err){
+  const chip = document.getElementById("livechip");
+  if(!chip) return;
+  if(ok && LIVE){
+    const hace = Math.round((Date.now() - new Date(LIVE.actualizado).getTime()) / 60000);
+    const txt = hace < 2 ? "ahora mismo" : hace < 90 ? "hace " + hace + " min" :
+                hace < 2880 ? "hace " + Math.round(hace/60) + " h" : "hace " + Math.round(hace/1440) + " d";
+    chip.className = "srclive on";
+    chip.innerHTML = '<span class="dot"></span> EN VIVO · ' + LIVE.eventos.length + ' eventos · ' + txt;
+    chip.title = "Fuente: " + (LIVE.origen || "feed público") + " · actualizado " + new Date(LIVE.actualizado).toLocaleString("es-ES");
+  }else{
+    chip.className = "srclive err";
+    chip.innerHTML = '<span class="dot"></span> sin datos en vivo' + (err ? " (" + err + ")" : "");
+    chip.title = "No se ha podido descargar datos.json. Se muestra el calendario curado.";
+  }
+}
+function baseEvents(){
+  const hayVivo = !!(LIVE && LIVE.eventos && LIVE.eventos.length);
+  if(state.fuente === "vivo")   return hayVivo ? LIVE.eventos : [];
+  if(state.fuente === "curado") return EVENTS;
+  return hayVivo ? LIVE.eventos : EVENTS;
+}
+
+/* ==========================================================================
    3. FILTRADO
    ========================================================================== */
 /* Desfase (ms) de una zona horaria respecto a UTC en un instante dado. */
@@ -1376,7 +1479,10 @@ function render(){
 
   renderSidebar(list);
   renderChips();
-  $("#srcbar").innerHTML = "Fuente principal: " + Object.values(SRC).map(s=>`<a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a>`).join(" · ") +
+  const avisoVivo = (LIVE && LIVE.eventos && LIVE.eventos.length && state.fuente !== "curado")
+    ? `<div style="margin-bottom:7px;color:var(--good)"><b>🟢 Datos en vivo</b> · origen: ${esc(LIVE.origen||"feed público")} · actualizado ${esc(new Date(LIVE.actualizado).toLocaleString("es-ES"))}. Los títulos llegan en inglés y la semana se refresca sola. Cambia <b>Fuente</b> a «Sólo mi calendario» para ver los análisis en español con notas y fuentes.</div>`
+    : "";
+  $("#srcbar").innerHTML = avisoVivo + "Fuente principal: " + Object.values(SRC).map(s=>`<a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a>`).join(" · ") +
     ` · ${list.length} de ${allEvents().length} eventos mostrados.`;
 }
 
@@ -1520,7 +1626,7 @@ function renderMini(){
 function saveState(){
   LS.set("range",state.range); LS.set("imps",state.imps); LS.set("curs",state.curs);
   LS.set("onlyUpcoming",state.onlyUpcoming); LS.set("groupDays",state.groupDays);
-  LS.set("tz",state.tz); LS.set("theme",state.theme); LS.set("showMap",state.showMap); LS.set("rxBase",state.rxBase);
+  LS.set("tz",state.tz); LS.set("theme",state.theme); LS.set("showMap",state.showMap); LS.set("rxBase",state.rxBase); LS.set("fuente",state.fuente);
 }
 
 $("#tabs").addEventListener("click", ev=>{
@@ -1564,6 +1670,11 @@ $("#reset").onclick = ()=>{
   document.querySelectorAll("[data-imp]").forEach(b=>b.classList.add("on"));
   render(); renderMini(); saveState();
 };
+$("#fuente").addEventListener("change", e=>{
+  state.fuente = e.target.value; saveState();
+  render(); renderMini();
+});
+$("#refreshlive").addEventListener("click", ()=>{ cargarVivo(); });
 $("#rxhelp").onclick = ()=> $("#rxmodal").classList.add("open");
 $("#rxclose").onclick = ()=> $("#rxmodal").classList.remove("open");
 $("#rxmodal").addEventListener("click", e=>{ if(e.target.id==="rxmodal") $("#rxmodal").classList.remove("open"); });
@@ -1755,6 +1866,9 @@ function init(){
   $("#onlyup").checked = state.onlyUpcoming;
   $("#groupdays").checked = state.groupDays;
   $("#q").value = state.q || "";
+  $("#fuente").value = state.fuente;
+  pintarChip(!!(LIVE && LIVE.eventos && LIVE.eventos.length));
+  cargarVivo(true);
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.range===state.range));
 
   const nextHi = allEvents().find(e=>e.i===3 && e._ts > Date.now());

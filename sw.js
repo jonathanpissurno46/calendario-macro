@@ -1,7 +1,7 @@
 /* Service worker del Calendario Económico Macro.
    Estrategia: red primero para el documento (así recibes las actualizaciones),
    caché primero para iconos y manifiesto. Funciona sin conexión. */
-const CACHE = 'calendario-macro-v1';
+const CACHE = 'calendario-macro-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest',
                 './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
@@ -26,12 +26,14 @@ self.addEventListener('fetch', e => {
   const esDocumento = req.mode === 'navigate' ||
                       url.pathname.endsWith('/') ||
                       url.pathname.endsWith('index.html');
+  /* datos.json cambia a diario: siempre se intenta traer la versión nueva */
+  const esDatos = url.pathname.endsWith('datos.json');
 
-  if (esDocumento) {
+  if (esDocumento || esDatos) {
     e.respondWith(
       fetch(req)
         .then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(req, c)); return r; })
-        .catch(() => caches.match('./index.html'))
+        .catch(() => caches.match(esDatos ? req : './index.html'))
     );
     return;
   }

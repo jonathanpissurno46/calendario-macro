@@ -6,6 +6,8 @@ Actualiza datos.json para el Calendario Economico Macro.
   1. Descarga el calendario economico publico de TradingView, que YA INCLUYE
      los valores reales publicados (actual), la prevision y el dato previo.
      No necesita ninguna clave ni registro.
+     - La semana en curso se pide en cada ejecucion (datos al minuto).
+     - El tramo futuro (DIAS_FUTURO dias) se pide una vez al dia y se guarda.
   2. Si TradingView fallara, usa el feed publico de ForexFactory como respaldo
      (en ese caso no habria valores reales, solo previsiones).
   3. Escribe datos.json en la raiz del repositorio.
@@ -29,6 +31,12 @@ UA = "Mozilla/5.0 (compatible; CalendarioMacro/1.0)"
 # Solo se publican los eventos de importancia media y alta (mas los festivos):
 # el calendario queda limpio y sin subastas ni indices menores.
 IMPORTANCIA_MINIMA = 0
+
+# Cuantos dias hacia delante se muestran ademas de la semana en curso.
+# El tramo futuro se refresca una vez al dia; la semana actual cada 10 minutos.
+DIAS_FUTURO = 28
+# Horas que pueden pasar antes de volver a pedir el tramo futuro
+HORAS_CADUCIDAD_FUTURO = 20
 
 
 def bajar_json(url, cabeceras=None):
@@ -155,21 +163,43 @@ def eventos_forex():
     return base
 
 
+def leer_anterior(destino):
+    if not os.path.exists(destino):
+        return {}
+    try:
+        with open(destino, encoding="utf-8") as fh:
+            datos = json.load(fh)
+        return datos if isinstance(datos, dict) else {}
+    except Exception:                                 # noqa: BLE001
+        return {}
+
+
+def fecha_de(evento):
+    return str(evento.get("date", ""))[:10]
+
+
 def main():
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     destino = os.path.join(raiz, "datos.json")
 
-    hoy = datetime.now(timezone.utc).date()
-    lunes = hoy - timedelta(days=hoy.weekday())
+    ahora = datetime.now(timezone.utc)
+    lunes = ahora.date() - timedelta(days=ahora.weekday())
     domingo = lunes + timedelta(days=6)
-    desde, hasta = lunes.isoformat(), domingo.isoformat()
+    fin_futuro = lunes + timedelta(days=DIAS_FUTURO)
+    sello_ahora = ahora.isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    anterior = leer_anterior(destino)
+    guardados = anterior.get("eventos", []) if isinstance(anterior.get("eventos"), list) else []
 
     origen = ""
     error_tv = ""
+    base = []
+
+    # ---- 1. Semana en curso: se pide siempre, para tener los datos al minuto ----
     try:
-        base = eventos_tradingview(desde, hasta)
+        base = eventos_tradingview(lunes.isoformat(), domingo.isoformat())
         origen = "TradingView (calendario publico, con valores reales)"
-        print("TradingView: %d eventos descargados." % len(base))
+        print("Semana en curso: %d eventos descargados." % len(base))
     except Exception as err:                          # noqa: BLE001
         error_tv = str(err)
         print("AVISO: TradingView fallo (%s). Se intenta ForexFactory." % err)
@@ -182,31 +212,55 @@ def main():
             print("       No se toca datos.json: los datos anteriores siguen intactos.")
             return 1
 
+    # ---- 2. Tramo futuro: se reaprovecha y se refresca como mucho una vez al dia ----
+    futuros = [e for e in guardados
+               if domingo.isoformat() < fecha_de(e) <= fin_futuro.isoformat()]
+    alcanza = bool(futuros) and max(fecha_de(e) for e in futuros) >= (fin_futuro - timedelta(days=5)).isoformat()
+    sello_futuro = anterior.get("futuroActualizado")
+    caducado = True
+    if sello_futuro:
+        try:
+            caducado = (ahora - datetime.fromisoformat(str(sello_futuro).replace("Z", "+00:00"))).total_seconds() \
+                       > HORAS_CADUCIDAD_FUTURO * 3600
+        except Exception:                             # noqa: BLE001
+            caducado = True
+
+    aviso_futuro = ""
+    if caducado or not alcanza:
+        try:
+            largos = eventos_tradingview((domingo + timedelta(days=1)).isoformat(), fin_futuro.isoformat())
+            print("Tramo futuro refrescado: %d eventos (hasta %s)." % (len(largos), fin_futuro.isoformat()))
+        except Exception as err:                      # noqa: BLE001
+            largos, sello_futuro = futuros, sello_futuro or sello_ahora
+            aviso_futuro = str(err)
+            print("AVISO: no se pudo refrescar el tramo futuro (%s)." % err)
+            print("       Se conservan los %d eventos futuros ya guardados." % len(futuros))
+        else:
+            sello_futuro = sello_ahora
+    else:
+        largos = futuros
+        print("Tramo futuro reutilizado de la ejecucion anterior: %d eventos." % len(largos))
+
+    base = base + largos
+    base.sort(key=lambda e: str(e.get("date", "")))
     con_real = sum(1 for e in base if e.get("actual"))
     print("Eventos con valor real publicado: %d de %d." % (con_real, len(base)))
 
     paquete = {
         "origen": origen,
         "conValoresReales": con_real,
+        "futuroActualizado": sello_futuro,
         "diagnostico": {
             "fuente": "TradingView" if origen.startswith("TradingView") else "ForexFactory",
             "eventos": len(base),
             "conValorReal": con_real,
-            "rango": desde + " a " + hasta,
+            "rango": lunes.isoformat() + " a " + fin_futuro.isoformat(),
             "avisoTradingView": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", error_tv)[:200] if error_tv else "",
+            "avisoFuturo": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", aviso_futuro)[:200] if aviso_futuro else "",
         },
         "eventos": base,
     }
-
-    # Si nada ha cambiado, se conserva la fecha anterior para no crear un commit cada 10 minutos
-    anterior = {}
-    if os.path.exists(destino):
-        try:
-            with open(destino, encoding="utf-8") as fh:
-                anterior = json.load(fh)
-        except Exception:                             # noqa: BLE001
-            anterior = {}
-    igual = isinstance(anterior, dict) and all(anterior.get(k) == v for k, v in paquete.items())
+    igual = bool(anterior) and all(anterior.get(k) == v for k, v in paquete.items())
     paquete["actualizado"] = (
         anterior.get("actualizado") if igual and anterior.get("actualizado")
         else datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")

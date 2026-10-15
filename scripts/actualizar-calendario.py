@@ -239,7 +239,12 @@ def main():
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     destino = os.path.join(raiz, "datos.json")
 
-    base = bajar_json(FF_URL)
+    try:
+        base = bajar_json(FF_URL)
+    except Exception as err:                          # noqa: BLE001
+        print("ERROR: no se pudo descargar el calendario base (%s)." % err)
+        print("       No se toca datos.json: los datos anteriores siguen intactos.")
+        return 1
     if not isinstance(base, list) or not base:
         print("ERROR: el feed base no devolvio eventos. No se toca datos.json.")
         return 1
@@ -252,24 +257,33 @@ def main():
 
     reales, origen = [], "ForexFactory"
     fallo = ""
-    if clave_fmp or clave_fh:
-        try:
-            if clave_fmp:
-                reales = valores_fmp(clave_fmp, desde, hasta)
-                origen = "ForexFactory + Financial Modeling Prep"
-            else:
-                reales = valores_finnhub(clave_fh, desde, hasta)
-                origen = "ForexFactory + Finnhub"
-            print("API de valores reales: %d registros descargados." % len(reales))
-            if not reales:
-                fallo = "La API respondio pero sin registros en esas fechas."
-        except Exception as err:                      # noqa: BLE001
-            fallo = str(err)
-            print("AVISO: fallo la API de valores reales (%s)." % err)
-            print("       Se guarda el calendario base; la app seguira funcionando.")
-            reales = []
-    else:
+    intentos = []
+    # Se prueban TODAS las claves disponibles, en orden, hasta que una funcione.
+    proveedores = []
+    if clave_fmp:
+        proveedores.append(("FMP_API_KEY", "Financial Modeling Prep", valores_fmp, clave_fmp))
+    if clave_fh:
+        proveedores.append(("FINNHUB_API_KEY", "Finnhub", valores_finnhub, clave_fh))
+
+    if not proveedores:
         print("Sin clave de API configurada: se guarda el calendario base.")
+    for nombre, etiqueta, funcion, clave in proveedores:
+        try:
+            datos = funcion(clave, desde, hasta)
+            print("%s: %d registros descargados." % (etiqueta, len(datos)))
+            intentos.append("%s: %d registros" % (etiqueta, len(datos)))
+            if datos:
+                reales = datos
+                origen = "ForexFactory + " + etiqueta
+                fallo = ""
+                break
+            fallo = "%s respondio sin registros" % etiqueta
+        except Exception as err:                      # noqa: BLE001
+            print("AVISO: %s fallo (%s). Se prueba el siguiente." % (etiqueta, err))
+            intentos.append("%s: ERROR %s" % (etiqueta, err))
+            fallo = "%s: %s" % (etiqueta, err)
+    if proveedores and not reales:
+        print("Ninguna API de valores reales ha funcionado; se guarda el calendario base.")
 
     def limpia(texto):
         """Quita del mensaje cualquier cosa que parezca una clave."""
@@ -287,6 +301,9 @@ def main():
             "longitudClave": len(clave),
             "apiRespondio": bool(reales),
             "registrosApi": len(reales),
+            "intentos": [limpia(i) for i in intentos],
+            "correcto": "Financial Modeling Prep" if "Financial Modeling" in origen
+                        else ("Finnhub" if "Finnhub" in origen else "ninguno"),
             "mensaje": limpia(fallo) if fallo else "",
         },
         "eventos": base,

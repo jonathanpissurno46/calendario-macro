@@ -2,7 +2,10 @@ name: Actualizar calendario
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Cada 10 minutos, pero empezando en el minuto 4 y no en el 0.
+    # GitHub recomienda evitar las horas "redondas" (:00, :10, :20...) porque
+    # es cuando mas carga tiene y puede retrasar o descartar la ejecucion.
+    - cron: "4,14,24,34,44,54 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -12,12 +15,9 @@ jobs:
   actualizar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Descargar el calendario y los valores reales
-        env:
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
           if [ -f scripts/actualizar-calendario.py ]; then
             python3 scripts/actualizar-calendario.py

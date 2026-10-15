@@ -3,16 +3,14 @@
 """
 Actualiza datos.json para el Calendario Economico Macro.
 
-  1. Descarga el calendario publico de la semana (ForexFactory).
-  2. Si hay una clave de API configurada, descarga tambien los VALORES REALES
-     ya publicados y los fusiona con el calendario base.
+  1. Descarga el calendario economico publico de TradingView, que YA INCLUYE
+     los valores reales publicados (actual), la prevision y el dato previo.
+     No necesita ninguna clave ni registro.
+  2. Si TradingView fallara, usa el feed publico de ForexFactory como respaldo
+     (en ese caso no habria valores reales, solo previsiones).
   3. Escribe datos.json en la raiz del repositorio.
 
-Claves (se leen de variables de entorno, nunca van escritas en el codigo):
-    FMP_API_KEY        -> financialmodelingprep.com   (se prueba primero)
-    FINNHUB_API_KEY    -> finnhub.io
-Si no hay ninguna, se guarda el calendario base sin valores reales y ya esta:
-la aplicacion lo detecta y sigue funcionando con la prevision.
+No usa claves de API de ningun tipo.
 """
 import json
 import os
@@ -20,76 +18,30 @@ import re
 import sys
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+TV_URL = ("https://economic-calendar.tradingview.com/events"
+          "?from={desde}T00:00:00.000Z&to={hasta}T23:59:59.000Z"
+          "&countries=US,EU,GB,JP,CA,AU,CN,CH,NZ,DE,FR,IT,ES")
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 UA = "Mozilla/5.0 (compatible; CalendarioMacro/1.0)"
 
-# Codigo de pais -> divisa (para emparejar las dos fuentes)
-PAIS_A_DIVISA = {
-    "US": "USD", "EU": "EUR", "EA": "EUR", "EZ": "EUR", "DE": "EUR", "FR": "EUR",
-    "IT": "EUR", "ES": "EUR", "GB": "GBP", "UK": "GBP", "JP": "JPY", "CA": "CAD",
-    "AU": "AUD", "CN": "CNY", "CH": "CHF", "NZ": "NZD",
-}
+# Solo se publican los eventos de importancia media y alta (mas los festivos):
+# el calendario queda limpio y sin subastas ni indices menores.
+IMPORTANCIA_MINIMA = 0
 
 
 def bajar_json(url, cabeceras=None):
-    pet = urllib.request.Request(url, headers=cabeceras or {"User-Agent": UA})
+    cab = {"User-Agent": UA}
+    if cabeceras:
+        cab.update(cabeceras)
+    pet = urllib.request.Request(url, headers=cab)
     with urllib.request.urlopen(pet, timeout=45) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
-# Palabras que no ayudan a distinguir un evento de otro
-RUIDO = {"speaks", "speech", "member", "statement", "press", "conference", "report",
-         "the", "of", "and", "a", "an", "in", "on", "for", "to", "s", "initial"}
-# Distintivos que DEBEN coincidir en las dos fuentes (si uno lo tiene, el otro tambien)
-CRITICOS = {"core", "ex", "prelim", "preliminary", "final", "advance", "flash",
-            "revised", "continuing", "mom", "yoy", "qoq"}
-# Como llama cada fuente a lo mismo
-SINONIMOS = {"yy": "yoy", "yoy": "yoy", "mm": "mom", "mom": "mom", "qq": "qoq", "qoq": "qoq",
-             "jobless": "unemployment", "philadelphia": "philly", "nonfarm": "nfp",
-             "non": "nfp", "farm": "nfp", "mom": "mom", "3m": "3m"}
-
-
-def normaliza(texto):
-    """Pasa 'y/y' a 'yoy', 'm/m' a 'mom'... para que las dos fuentes se entiendan."""
-    t = str(texto or "").lower()
-    t = re.sub(r"\by\s*/\s*y\b", " yoy ", t)
-    t = re.sub(r"\bm\s*/\s*m\b", " mom ", t)
-    t = re.sub(r"\bq\s*/\s*q\b", " qoq ", t)
-    t = re.sub(r"\by/y\b|\bm/m\b|\bq/q\b", " ", t)
-    return re.sub(r"[^a-z0-9 ]+", " ", t).split()
-
-
-def palabras(titulo):
-    salida = set()
-    for t in normaliza(titulo):
-        t = SINONIMOS.get(t, t)
-        if t in RUIDO:
-            continue
-        salida.add(t)
-    return salida
-
-
-def encajan(titulo_feed, titulo_api):
-    """Devuelve una puntuacion de 0 a 1. 0 = no son el mismo evento."""
-    a, b = palabras(titulo_feed), palabras(titulo_api)
-    if not a or not b:
-        return 0.0
-    if (a & CRITICOS) != (b & CRITICOS):
-        return 0.0                      # core vs no-core, preliminar vs final...
-    comunes = a & b
-    if not comunes:
-        return 0.0
-    cob_base = len(comunes) / len(a)
-    cob_api = len(comunes) / len(b)
-    if cob_base < 0.6 or cob_api < 0.5:
-        return 0.0                      # no se parecen lo suficiente
-    return round((cob_base + cob_api) / 2, 3)
-
-
 def a_numero(valor):
-    """Convierte '215K', '1.2%', '-0.1%' o 3.7 al numero que usa la aplicacion."""
+    """Convierte '3.7', '-39.3K' o 0.3 al numero que usa la aplicacion."""
     if valor is None:
         return None
     texto = str(valor).replace(",", "").replace("%", "").replace("+", "").strip()
@@ -107,204 +59,141 @@ def a_numero(valor):
 
 
 def bonito(numero):
-    """20500 -> '20.5K' (mismo valor, más legible), solo si es exacto."""
+    """3990000 -> '3.99M'; -39300 -> '-39.3K'. Solo si la conversion es exacta."""
     for corte, sufijo in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
         if abs(numero) >= corte:
-            reducido = round(numero / corte, 1)
-            if abs(reducido * corte - numero) < 1e-6:
-                return ("%g" % reducido) + sufijo
+            reducido = numero / corte
+            for decimales in (1, 2, 3):
+                if abs(round(reducido, decimales) * corte - numero) < 1e-6:
+                    return ("%g" % round(reducido, decimales)) + sufijo
             return "%g" % numero
     return "%g" % numero
 
 
-def formatea(valor, unidad):
-    """Devuelve el valor real como texto, con el mismo estilo que el feed base."""
+# Solo se marca con "%" lo que lleva periodo (YoY/MoM/QoQ) o la palabra "Rate".
+# Asi un nivel de indice ("CPI" = 336.94, "Business Confidence" = -13) no se
+# confunde con un porcentaje.
+RE_PORCENTAJE = re.compile(r"\b(yoy|mom|qoq|rate)\b", re.I)
+
+
+def es_porcentaje(titulo):
+    return bool(RE_PORCENTAJE.search(titulo or ""))
+
+
+def texto_valor(evento, campo):
+    """Devuelve el valor como texto legible. Devuelve '' si no hay dato."""
+    valor = evento.get(campo)
     if valor is None or valor == "":
         return ""
-    if isinstance(valor, str):
-        limpio = valor.strip()
-        if not limpio:
-            return ""
-        numero = a_numero(limpio)
-        if numero is None:
-            return limpio
-    else:
-        numero = a_numero(valor)
-        if numero is None:
-            return ""
-    unidad = (unidad or "").strip()
-    if unidad == "%":
-        return ("%g" % numero) + "%"
-    if unidad.upper() in ("K", "M", "B"):
-        # Si ya viene escalado (20500 con unidad K) no se le vuelve a añadir
-        return ("%g" % numero) + unidad.upper() if abs(numero) < 1000 else bonito(numero)
-    return bonito(numero)
+    bruto = evento.get(campo + "Raw")
+    crudo = a_numero(bruto) if bruto is not None else None
+    numero = a_numero(valor)
+    if numero is None:
+        return str(valor).strip()
+    # Si el valor bruto esta escalado (3990000 frente a 3.99), no es un porcentaje
+    escalado = crudo is not None and abs(crudo - numero) > 1e-9
+    titulo = str(evento.get("title") or evento.get("indicator") or "")
+    unidad = "%" if (not escalado and es_porcentaje(titulo)) else ""
+    return bonito(numero) + unidad
 
 
-def valores_fmp(clave, desde, hasta):
-    url = ("https://financialmodelingprep.com/api/v3/economic_calendar"
-           "?from=%s&to=%s&apikey=%s" % (desde, hasta, urllib.parse.quote(clave)))
-    datos = bajar_json(url)
-    if isinstance(datos, dict) and datos.get("Error Message"):
-        raise RuntimeError(datos["Error Message"])
-    salida = []
-    for x in datos if isinstance(datos, list) else []:
-        salida.append({
-            "divisa": (x.get("currency") or PAIS_A_DIVISA.get(str(x.get("country", "")).upper(), "")).upper(),
-            "fecha": str(x.get("date", ""))[:10],
-            "titulo": x.get("event") or x.get("title") or "",
-            "actual": x.get("actual"),
-            "unidad": x.get("unit") or "",
-        })
-    return salida
+def eventos_tradingview(desde, hasta):
+    """Lista de eventos desde el calendario publico de TradingView."""
+    datos = bajar_json(
+        TV_URL.format(desde=desde, hasta=hasta),
+        {"Origin": "https://www.tradingview.com",
+         "Referer": "https://www.tradingview.com/economic-calendar/"},
+    )
+    lista = datos.get("result") if isinstance(datos, dict) else None
+    if not isinstance(lista, list) or not lista:
+        raise RuntimeError("TradingView no devolvio eventos")
 
-
-def valores_finnhub(clave, desde, hasta):
-    url = ("https://finnhub.io/api/v1/calendar/economic"
-           "?from=%s&to=%s&token=%s" % (desde, hasta, urllib.parse.quote(clave)))
-    datos = bajar_json(url)
-    lista = datos.get("economicCalendar", []) if isinstance(datos, dict) else []
     salida = []
     for x in lista:
-        pais = str(x.get("country", "")).upper()
-        salida.append({
-            "divisa": PAIS_A_DIVISA.get(pais, pais),
-            "fecha": str(x.get("time", ""))[:10],
-            "titulo": x.get("event") or "",
-            "actual": x.get("actual"),
-            "unidad": x.get("unit") or "",
-        })
+        divisa = str(x.get("currency") or "").upper()
+        fecha = str(x.get("date") or "")
+        titulo = str(x.get("title") or x.get("indicator") or "").strip()
+        if not divisa or not fecha or not titulo:
+            continue
+        try:
+            importancia = int(x.get("importance"))
+        except (TypeError, ValueError):
+            importancia = -1
+        es_festivo = "holiday" in titulo.lower()
+        if importancia < IMPORTANCIA_MINIMA and not es_festivo:
+            continue
+
+        momento = fecha
+        todoeldia = False
+        if es_festivo:
+            momento = fecha[:10] + "T12:00:00Z"      # los festivos, anclados a mediodia
+            todoeldia = True
+
+        evento = {
+            "title": titulo,
+            "country": divisa,
+            "date": momento,
+            "impact": "Holiday" if es_festivo else ("High" if importancia >= 1
+                                                    else "Medium" if importancia == 0 else "Low"),
+            "actual": texto_valor(x, "actual"),
+            "forecast": texto_valor(x, "forecast"),
+            "previous": texto_valor(x, "previous"),
+        }
+        if todoeldia:
+            evento["allDay"] = True
+        salida.append(evento)
+    if not salida:
+        raise RuntimeError("TradingView no devolvio eventos utiles")
     return salida
 
 
-def fusiona(base, reales):
-    """Copia el valor real al evento que le corresponde del calendario base."""
-    indice = {}
-    for r in reales:
-        if r["divisa"] and r["fecha"]:
-            indice.setdefault((r["divisa"], r["fecha"]), []).append(r)
-
-    puestos = 0
-    descartados = 0
-    for evento in base:
-        divisa = str(evento.get("country", "")).upper()
-        fecha = str(evento.get("date", ""))[:10]
-        candidatos = []
-        for desplazamiento in (0, -1, 1):     # el feed va en hora de Nueva York y la API puede ir en UTC
-            if desplazamiento == 0:
-                dia = fecha
-            else:
-                try:
-                    from datetime import date, timedelta
-                    d = date.fromisoformat(fecha) + timedelta(days=desplazamiento)
-                    dia = d.isoformat()
-                except ValueError:
-                    continue
-            candidatos.extend(indice.get((divisa, dia), []))
-        if not candidatos:
-            continue
-        # Solo se acepta si el nombre del evento coincide de verdad
-        puntuados = []
-        for c in candidatos:
-            nota = encajan(evento.get("title"), c["titulo"])
-            if nota > 0:
-                puntuados.append((nota, c))
-        if not puntuados:
-            continue
-        puntuados.sort(key=lambda x: -x[0])
-        if len(puntuados) > 1 and puntuados[0][0] == puntuados[1][0] and \
-           formatea(puntuados[0][1]["actual"], puntuados[0][1]["unidad"]) != \
-           formatea(puntuados[1][1]["actual"], puntuados[1][1]["unidad"]):
-            descartados += 1
-            continue                     # empate ambiguo: mejor no arriesgar
-        mejor = puntuados[0][1]
-        texto = formatea(mejor["actual"], mejor["unidad"])
-        if not texto:
-            continue
-        real = a_numero(texto)
-        previsto = a_numero(evento.get("forecast"))
-        # Si las escalas no cuadran (p. ej. 20500 frente a 19.6K), mejor no inventar
-        if real is not None and previsto not in (None, 0):
-            if not (0.01 <= abs(real / previsto) <= 100):
-                descartados += 1
-                continue
-        evento["actual"] = texto
-        puestos += 1
-    if descartados:
-        print("Descartados por dudas de emparejamiento o de escala: %d" % descartados)
-    return puestos
+def eventos_forex():
+    """Respaldo: feed publico de ForexFactory (sin valores reales)."""
+    base = bajar_json(FF_URL)
+    if not isinstance(base, list) or not base:
+        raise RuntimeError("ForexFactory no devolvio eventos")
+    return base
 
 
 def main():
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     destino = os.path.join(raiz, "datos.json")
 
+    hoy = datetime.now(timezone.utc).date()
+    lunes = hoy - timedelta(days=hoy.weekday())
+    domingo = lunes + timedelta(days=6)
+    desde, hasta = lunes.isoformat(), domingo.isoformat()
+
+    origen = ""
+    error_tv = ""
     try:
-        base = bajar_json(FF_URL)
+        base = eventos_tradingview(desde, hasta)
+        origen = "TradingView (calendario publico, con valores reales)"
+        print("TradingView: %d eventos descargados." % len(base))
     except Exception as err:                          # noqa: BLE001
-        print("ERROR: no se pudo descargar el calendario base (%s)." % err)
-        print("       No se toca datos.json: los datos anteriores siguen intactos.")
-        return 1
-    if not isinstance(base, list) or not base:
-        print("ERROR: el feed base no devolvio eventos. No se toca datos.json.")
-        return 1
-
-    fechas = sorted({str(x.get("date", ""))[:10] for x in base if x.get("date")})
-    desde, hasta = fechas[0], fechas[-1]
-
-    clave_fmp = os.environ.get("FMP_API_KEY", "").strip()
-    clave_fh = os.environ.get("FINNHUB_API_KEY", "").strip()
-
-    reales, origen = [], "ForexFactory"
-    fallo = ""
-    intentos = []
-    # Se prueban TODAS las claves disponibles, en orden, hasta que una funcione.
-    proveedores = []
-    if clave_fmp:
-        proveedores.append(("FMP_API_KEY", "Financial Modeling Prep", valores_fmp, clave_fmp))
-    if clave_fh:
-        proveedores.append(("FINNHUB_API_KEY", "Finnhub", valores_finnhub, clave_fh))
-
-    if not proveedores:
-        print("Sin clave de API configurada: se guarda el calendario base.")
-    for nombre, etiqueta, funcion, clave in proveedores:
+        error_tv = str(err)
+        print("AVISO: TradingView fallo (%s). Se intenta ForexFactory." % err)
         try:
-            datos = funcion(clave, desde, hasta)
-            print("%s: %d registros descargados." % (etiqueta, len(datos)))
-            intentos.append("%s: %d registros" % (etiqueta, len(datos)))
-            if datos:
-                reales = datos
-                origen = "ForexFactory + " + etiqueta
-                fallo = ""
-                break
-            fallo = "%s respondio sin registros" % etiqueta
-        except Exception as err:                      # noqa: BLE001
-            print("AVISO: %s fallo (%s). Se prueba el siguiente." % (etiqueta, err))
-            intentos.append("%s: ERROR %s" % (etiqueta, err))
-            fallo = "%s: %s" % (etiqueta, err)
-    if proveedores and not reales:
-        print("Ninguna API de valores reales ha funcionado; se guarda el calendario base.")
+            base = eventos_forex()
+            origen = "ForexFactory (solo previsiones, sin valores reales)"
+            print("ForexFactory: %d eventos descargados." % len(base))
+        except Exception as err2:                     # noqa: BLE001
+            print("ERROR: tampoco se pudo usar ForexFactory (%s)." % err2)
+            print("       No se toca datos.json: los datos anteriores siguen intactos.")
+            return 1
 
-    def limpia(texto):
-        """Quita del mensaje cualquier cosa que parezca una clave."""
-        return re.sub(r"[A-Za-z0-9_\-]{18,}", "***", str(texto))[:200]
+    con_real = sum(1 for e in base if e.get("actual"))
+    print("Eventos con valor real publicado: %d de %d." % (con_real, len(base)))
 
-    puestos = fusiona(base, reales) if reales else 0
-    print("Valores reales fusionados: %d de %d eventos." % (puestos, len(base)))
-
-    clave = clave_fmp or clave_fh
     paquete = {
-        "origen": origen if puestos else "ForexFactory (sin valores reales)",
-        "conValoresReales": puestos,
+        "origen": origen,
+        "conValoresReales": con_real,
         "diagnostico": {
-            "claveDetectada": "FMP_API_KEY" if clave_fmp else ("FINNHUB_API_KEY" if clave_fh else "ninguna"),
-            "longitudClave": len(clave),
-            "apiRespondio": bool(reales),
-            "registrosApi": len(reales),
-            "intentos": [limpia(i) for i in intentos],
-            "correcto": "Financial Modeling Prep" if "Financial Modeling" in origen
-                        else ("Finnhub" if "Finnhub" in origen else "ninguno"),
-            "mensaje": limpia(fallo) if fallo else "",
+            "fuente": "TradingView" if origen.startswith("TradingView") else "ForexFactory",
+            "eventos": len(base),
+            "conValorReal": con_real,
+            "rango": desde + " a " + hasta,
+            "avisoTradingView": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", error_tv)[:200] if error_tv else "",
         },
         "eventos": base,
     }
@@ -317,20 +206,15 @@ def main():
                 anterior = json.load(fh)
         except Exception:                             # noqa: BLE001
             anterior = {}
-    igual = isinstance(anterior, dict) and all(
-        anterior.get(k) == v for k, v in paquete.items()
+    igual = isinstance(anterior, dict) and all(anterior.get(k) == v for k, v in paquete.items())
+    paquete["actualizado"] = (
+        anterior.get("actualizado") if igual and anterior.get("actualizado")
+        else datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     )
-    paquete["actualizado"] = (anterior.get("actualizado") if igual and anterior.get("actualizado")
-                              else datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"))
 
     with open(destino, "w", encoding="utf-8") as fh:
         json.dump(paquete, fh, ensure_ascii=False, separators=(",", ":"))
-    print("Escrito %s (%d eventos)." % (destino, len(base)))
-    print("DIAGNOSTICO -> clave: %s | api respondio: %s | registros: %d | mensaje: %s"
-          % (paquete["diagnostico"]["claveDetectada"],
-             paquete["diagnostico"]["apiRespondio"],
-             paquete["diagnostico"]["registrosApi"],
-             paquete["diagnostico"]["mensaje"] or "(ninguno)"))
+    print("Escrito %s (%d eventos, %d con valor real)." % (destino, len(base), con_real))
     return 0
 
 

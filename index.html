@@ -1277,6 +1277,9 @@ function rxDetail(e){
    dominio no hay problema de CORS. Si no existe, se usa el calendario curado.
    ========================================================================== */
 let LIVE = LS.get("vivo", null);           // { actualizado, origen, eventos:[...] }
+let ultimoFetch = 0;                       // para no repetir descargas
+let detalleAbierto = null;                 // fila expandida, para no perderla al refrescar
+const INTERVALO_REFRESCO = 180000;          // 3 minutos
 
 function clasificar(title){
   const t = (title || "").toLowerCase();
@@ -1307,9 +1310,10 @@ function mapFF(x){
     allDay: allDay, live: true
   };
 }
-async function cargarVivo(silencioso){
+async function cargarVivo(silencioso, suave){
   const chip = document.getElementById("livechip");
   if(chip && !silencioso){ chip.className = "srclive"; chip.innerHTML = '<span class="dot"></span> descargando…'; }
+  const antes = (LIVE && LIVE.eventos) ? JSON.stringify(LIVE.eventos) : "";
   try{
     const r = await fetch("datos.json?_=" + Date.now(), { cache: "no-store" });
     if(!r.ok) throw new Error("HTTP " + r.status);
@@ -1322,16 +1326,39 @@ async function cargarVivo(silencioso){
       eventos: arr.map(mapFF).filter(e=>e.d && e.c)
     };
     LS.set("vivo", LIVE);
+    ultimoFetch = Date.now();
     pintarChip(true);
-    if(state.fuente !== "curado"){ render(); renderMini(); }
+    const cambio = JSON.stringify(LIVE.eventos) !== antes;
+    if(state.fuente !== "curado" && (cambio || !antes)){
+      if(suave) renderSuave(); else render();
+      renderMini();
+    }
     return true;
   }catch(err){
+    ultimoFetch = Date.now();
     if(!LIVE) LIVE = null;
     pintarChip(false, err.message);
     if(state.fuente === "vivo" && !LIVE) render();
     return false;
   }
 }
+/* Repinta sin que el usuario pierda el sitio donde estaba leyendo. */
+function renderSuave(){
+  const y = window.scrollY;
+  render();
+  if(Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+}
+/* Refresco silencioso: sólo mientras la pestaña está a la vista. */
+function autoRefresco(){
+  if(document.visibilityState !== "visible") return;
+  if(state.fuente === "curado") return;
+  if(Date.now() - ultimoFetch < 60000) return;
+  cargarVivo(true, true);
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible") autoRefresco();
+});
+
 function pintarChip(ok, err){
   const chip = document.getElementById("livechip");
   if(!chip) return;
@@ -1475,6 +1502,12 @@ function render(){
     if(frag) tbody.insertAdjacentHTML("beforeend", frag);
   } else {
     tbody.innerHTML = list.map(e=>rowHTML(e, now)).join("");
+  }
+
+  /* si había una fila abierta, se vuelve a abrir en su sitio */
+  if(detalleAbierto !== null){
+    const tr = document.querySelector(`tr.ev[data-id="${detalleAbierto}"]`);
+    if(tr) insertarDetalle(tr); else detalleAbierto = null;
   }
 
   renderSidebar(list);
@@ -1696,14 +1729,18 @@ $("#nextlist").addEventListener("click", ev=>{
 });
 
 /* --- expandir detalle --- */
+function insertarDetalle(tr){
+  const e = allEvents().find(x=>x._id === +tr.dataset.id);
+  if(!e) return;
+  tr.insertAdjacentHTML("afterend", detailHTML(e));
+  detalleAbierto = +tr.dataset.id;
+}
 $("#tbody").addEventListener("click", ev=>{
   const tr = ev.target.closest("tr.ev"); if(!tr) return;
-  const id = +tr.dataset.id;
   const next = tr.nextElementSibling;
-  if(next && next.classList.contains("detail")){ next.remove(); return; }
+  if(next && next.classList.contains("detail")){ next.remove(); detalleAbierto = null; return; }
   document.querySelectorAll("tr.detail").forEach(d=>d.remove());
-  const e = allEvents().find(x=>x._id===id);
-  if(e) tr.insertAdjacentHTML("afterend", detailHTML(e));
+  insertarDetalle(tr);
 });
 $("#tbody").addEventListener("click", ev=>{
   const b = ev.target.closest("[data-setactual]"); if(!b) return;
@@ -1876,6 +1913,7 @@ function init(){
 
   renderMini(); render(); tick();
   setInterval(tick, 1000);
+  setInterval(autoRefresco, INTERVALO_REFRESCO);
   setInterval(()=>{ if(!state.day) { render(); renderMini(); } }, 60000);
   window.addEventListener("resize", syncSticky);
   syncSticky();

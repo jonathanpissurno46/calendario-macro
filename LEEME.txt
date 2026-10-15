@@ -119,7 +119,7 @@ ni PHP, ni Node en el servidor. Cualquier hosting estático sirve.
 =========================================================
 QUE SE ACTUALICE SOLO  (robot de GitHub, opcional)
 =========================================================
-Tu web puede descargarse el calendario sola cada 4 horas. Asi no tienes que
+Tu web puede descargarse el calendario sola cada 10 minutos. Asi no tienes que
 volver a subir nada cuando cambien los eventos. Se instala UNA sola vez:
 
   1. En tu repositorio pulsa   Add file  >  Create new file
@@ -147,12 +147,12 @@ sigue funcionando con la version curada que va dentro de la aplicacion.
 name: Actualizar calendario
 
 # Descarga el calendario economico publico y lo deja como datos.json en tu web.
-# Se ejecuta solo cada 4 horas y tambien puede lanzarse a mano desde la pestana
+# Se ejecuta solo cada 10 minutos y tambien puede lanzarse a mano desde la pestana
 # "Actions" con el boton "Run workflow".
 
 on:
   schedule:
-    - cron: "17 */4 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -193,7 +193,7 @@ jobs:
 
 Que hace el robot exactamente
 -----------------------------
-  - Cada 4 horas pide el calendario publico a nfs.faireconomy.media
+  - Cada 10 minutos pide el calendario publico a nfs.faireconomy.media
   - Comprueba que la respuesta sea valida (si no, no toca nada)
   - Si hay cambios, hace un commit automatico con datos.json
   - Tu pagina lee ese datos.json de tu propio dominio, asi que no hay
@@ -201,3 +201,19 @@ Que hace el robot exactamente
 
   El feed cubre la SEMANA EN CURSO, de lunes a domingo. En la aplicacion
   puedes alternar en "Fuente" entre los datos en vivo y tu calendario curado.
+
+Cuanto tarda en verse un dato nuevo
+-----------------------------------
+  Publicacion oficial  ->  feed publico      : segundos o pocos minutos
+  feed publico         ->  robot de GitHub   : hasta 10 minutos (se ejecuta
+                                               cada 10 min; GitHub puede
+                                               retrasarlo algo mas si hay carga)
+  robot                ->  tu pantalla       : la app consulta sola cada 3 min,
+                                               y siempre al abrirla o al volver
+                                               a la pestana
+
+  Es decir: entre que sale el dato y lo ves pasan, en el mejor de los casos,
+  2-3 minutos, y en el peor 10-15. El boton de refresco (el circulito junto al
+  chip verde) fuerza la consulta en el momento. Para el segundo exacto de la
+  publicacion usa tu plataforma de trading: aqui la ventaja es saber la
+  DIRECCION de cada activo, no cazar el tick.

@@ -1,0 +1,1916 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendario Económico · Macro Desk</title>
+<style>
+/* ============================ TEMA ============================ */
+:root{
+  --bg:#0e1117; --bg2:#141a23; --panel:#161d27; --panel2:#1b2431;
+  --border:#26313f; --border2:#324153;
+  --text:#e8eef6; --muted:#8b9bb0; --muted2:#63748b;
+  --accent:#3b82f6; --accent2:#60a5fa;
+  --high:#ff4d4d; --med:#ff9f2e; --low:#f2d33c;
+  --good:#22c55e; --bad:#ef4444; --neutral:#7c8da3;
+  --row-hover:#1d2734; --day-bg:#101720;
+  --hl:#ffd60a; --hlsoft:rgba(255,214,10,.14);
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --radius:12px;
+}
+html[data-theme="light"]{
+  --bg:#eef1f6; --bg2:#e6ebf2; --panel:#ffffff; --panel2:#f6f8fb;
+  --border:#dde3ec; --border2:#c9d3e0;
+  --text:#16202e; --muted:#5c6b80; --muted2:#8494a8;
+  --accent:#1d4ed8; --accent2:#2563eb;
+  --high:#e5484d; --med:#e08700; --low:#c9a800;
+  --good:#12873f; --bad:#d13438; --neutral:#64748b;
+  --row-hover:#f1f5fb; --day-bg:#e4eaf3;
+  --hl:#e0b000; --hlsoft:rgba(224,176,0,.16);
+  --shadow:0 8px 24px rgba(20,35,60,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text); min-height:100vh;
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent2)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px}
+
+/* ============================ CABECERA ============================ */
+.topbar{
+  position:sticky;top:0;z-index:60;background:color-mix(in srgb,var(--panel) 92%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border);
+}
+.topbar-in{display:flex;align-items:center;gap:14px;padding:10px 16px;flex-wrap:wrap;max-width:1680px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.2px;white-space:nowrap}
+.brand .logo{
+  width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--accent),#8b5cf6);color:#fff;font-size:15px;box-shadow:var(--shadow);
+}
+.brand small{display:block;font-weight:500;font-size:11px;color:var(--muted);letter-spacing:.2px}
+.tabs{display:flex;gap:4px;background:var(--bg2);padding:4px;border-radius:10px;border:1px solid var(--border);flex-wrap:wrap}
+.tab{
+  border:0;background:transparent;padding:6px 12px;border-radius:7px;cursor:pointer;
+  color:var(--muted);font-weight:600;font-size:13px;white-space:nowrap;
+}
+.tab:hover{color:var(--text);background:var(--panel2)}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 10px color-mix(in srgb,var(--accent) 45%,transparent)}
+.spacer{flex:1 1 auto}
+.search{position:relative;display:flex;align-items:center}
+.search input{
+  background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 12px 8px 30px;
+  width:210px;outline:none;transition:.15s;
+}
+.search input:focus{border-color:var(--accent);width:260px}
+.search svg{position:absolute;left:9px;opacity:.55;pointer-events:none}
+.iconbtn{
+  background:var(--bg2);border:1px solid var(--border);width:36px;height:36px;border-radius:9px;
+  cursor:pointer;display:grid;place-items:center;transition:.15s;
+}
+.iconbtn:hover{border-color:var(--accent);color:var(--accent2)}
+select.tz{
+  background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:0 10px;height:36px;cursor:pointer;outline:none;max-width:210px;
+}
+.clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;min-width:118px}
+.clock b{font-variant-numeric:tabular-nums;font-size:15px}
+.clock span{font-size:11px;color:var(--muted)}
+
+/* ============================ LAYOUT ============================ */
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);gap:18px;padding:18px 16px 60px;max-width:1680px;margin:0 auto;align-items:start}
+@media(max-width:1100px){.layout{grid-template-columns:1fr}}
+aside{position:sticky;top:70px;display:flex;flex-direction:column;gap:14px}
+@media(max-width:1100px){aside{position:static}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card h3{margin:0;padding:11px 14px;font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card .body{padding:12px 14px}
+
+/* Cuenta atrás */
+.countdown{padding:14px;background:linear-gradient(150deg,color-mix(in srgb,var(--high) 18%,var(--panel)),var(--panel))}
+.countdown .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:flex;justify-content:space-between}
+.countdown .nm{font-weight:700;margin:6px 0 2px;font-size:15px;line-height:1.25}
+.countdown .meta{font-size:12px;color:var(--muted);margin-bottom:10px}
+.cd-timer{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;letter-spacing:-.5px}
+.cd-timer.soon{color:var(--high);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.55}}
+
+/* Mini calendario */
+.mini-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border)}
+.mini-head b{font-size:13px;text-transform:capitalize}
+.mini-head button{background:transparent;border:1px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;color:var(--muted)}
+.mini-head button:hover{color:var(--accent2);border-color:var(--accent)}
+.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:10px}
+.mini-grid .dow{text-align:center;font-size:10px;color:var(--muted2);font-weight:700;padding-bottom:2px}
+.mini-day{
+  position:relative;aspect-ratio:1;border-radius:8px;border:1px solid transparent;background:transparent;
+  cursor:pointer;display:grid;place-items:center;font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted);
+}
+.mini-day.has{background:var(--panel2);color:var(--text);font-weight:600}
+.mini-day:hover{border-color:var(--accent)}
+.mini-day.today{border-color:var(--accent);color:var(--accent2);font-weight:800}
+.mini-day.sel{background:var(--accent);color:#fff}
+.mini-day .dots{position:absolute;bottom:3px;display:flex;gap:2px}
+.mini-day .dots i{width:4px;height:4px;border-radius:50%;display:block}
+.mini-day.sel .dots i{opacity:.9}
+.dot-h{background:var(--high)}.dot-m{background:var(--med)}.dot-l{background:var(--low)}
+
+/* Próximos */
+.next-list{display:flex;flex-direction:column;max-height:330px;overflow:auto}
+.next-item{display:flex;gap:10px;padding:9px 13px;border-bottom:1px solid var(--border);cursor:pointer;align-items:flex-start}
+.next-item:last-child{border-bottom:0}
+.next-item:hover{background:var(--row-hover)}
+.next-item .t{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);min-width:44px;font-weight:600}
+.next-item .n{font-size:12.5px;line-height:1.3}
+.next-item .s{font-size:11px;color:var(--muted2);margin-top:2px}
+
+/* ============================ FILTROS ============================ */
+.filters{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:11px 13px;display:flex;flex-wrap:wrap;gap:9px 14px;align-items:center;box-shadow:var(--shadow);margin-bottom:14px;
+}
+.fgroup{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.fgroup>label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700}
+.chip{
+  border:1px solid var(--border);background:var(--bg2);border-radius:999px;padding:4px 11px;cursor:pointer;
+  font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:.13s;color:var(--muted);
+}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.on.imp-h{background:var(--high);border-color:var(--high)}
+.chip.on.imp-m{background:var(--med);border-color:var(--med);color:#241a00}
+.chip.on.imp-l{background:var(--low);border-color:var(--low);color:#241f00}
+.chip .sq{display:inline-flex;gap:1.5px}
+.chip .sq i{width:5px;height:5px;border-radius:1px;background:currentColor;opacity:.35}
+.chip .sq i.f{opacity:1}
+.curchip{font-variant-numeric:tabular-nums}
+.toggle{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;color:var(--muted);font-weight:600;user-select:none}
+.toggle input{appearance:none;width:34px;height:19px;border-radius:999px;background:var(--border2);position:relative;cursor:pointer;transition:.18s;border:0}
+.toggle input:checked{background:var(--accent)}
+.toggle input::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.18s}
+.toggle input:checked::after{left:17px}
+.btn{
+  background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:6px 12px;cursor:pointer;
+  font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:.13s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent2);color:#fff}
+
+/* ============================ TABLA ============================ */
+.tablewrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+thead th:first-child{border-top-left-radius:var(--radius)}
+thead th:last-child{border-top-right-radius:var(--radius)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{
+  position:sticky;top:var(--thead-top,57px);z-index:30;background:var(--panel2);border-bottom:1px solid var(--border2);
+  padding:9px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+  font-weight:700;white-space:nowrap;
+}
+tbody tr.day-row td{
+  background:var(--day-bg);padding:7px 12px;font-weight:700;font-size:12.5px;letter-spacing:.3px;
+  border-top:1px solid var(--border2);border-bottom:1px solid var(--border);
+}
+tbody tr.day-row .cnt{font-weight:600;color:var(--muted);font-size:11.5px;margin-left:8px;letter-spacing:0}
+tbody tr.day-row .rel{float:right;font-weight:600;color:var(--accent2);font-size:11.5px;letter-spacing:0}
+tbody tr.ev{border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+tbody tr.ev:hover{background:var(--row-hover)}
+tbody tr.ev.past{opacity:.62}
+tbody tr.ev.past:hover{opacity:.9}
+tbody tr.ev.now{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 3px 0 0 var(--accent)}
+tbody tr.ev.hi{box-shadow:inset 3px 0 0 var(--high)}
+tbody tr.ev.now.hi{box-shadow:inset 3px 0 0 var(--accent)}
+td{padding:9px 10px;vertical-align:middle}
+.col-time{width:86px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col-time .t{font-weight:600}
+.col-time .left{display:block;font-size:10.5px;color:var(--muted2);font-weight:500}
+.col-cur{width:74px;white-space:nowrap}
+.col-imp{width:74px}
+.col-ev{min-width:240px}
+.col-val{width:96px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.col-val .v{font-weight:600}
+.col-val .d{display:block;font-size:10.5px;font-weight:700}
+.col-val .d.up{color:var(--good)}.col-val .d.dn{color:var(--bad)}
+.mini-vals{display:none}
+
+/* ---------- mapa de reacción por activo ---------- */
+.rxdir{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:5px}
+.rxdir .tag{font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+.rxdir.live .tag{color:var(--accent2)}
+.rxdir.pend .tag{color:var(--muted2)}
+.rxdir.pend .rxw{opacity:.8}
+.rxdir.live .rxw{border-width:2px;font-size:12.5px}
+.rxline{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.rxlbl{font-size:9.5px;font-weight:900;letter-spacing:.3px;text-transform:uppercase;padding:2px 6px;border-radius:5px;white-space:nowrap;min-width:86px;text-align:center;background:var(--hl);color:#1a1400}
+.rxlbl.up{background:var(--hl);color:#1a1400}
+.rxlbl.dn{background:var(--hl);color:#1a1400}
+.rxlbl.n{background:color-mix(in srgb,var(--neutral) 18%,transparent);color:var(--neutral)}
+.rxchip{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-variant-numeric:tabular-nums;background:color-mix(in srgb,var(--panel) 75%,transparent);border:1px solid color-mix(in srgb,var(--hl) 28%,transparent);border-radius:6px;padding:1px 5px;white-space:nowrap}
+.rxw{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:7px;padding:2px 9px;white-space:nowrap;border:1.5px solid transparent}
+.rxw i{font-style:normal;font-weight:900;letter-spacing:-1.5px;font-size:12.5px}
+.rxw b{font-weight:900;letter-spacing:.3px}
+.rxw.up{background:color-mix(in srgb,var(--good) 15%,transparent);border-color:color-mix(in srgb,var(--good) 55%,transparent);color:var(--good)}
+.rxw.dn{background:color-mix(in srgb,var(--bad) 15%,transparent);border-color:color-mix(in srgb,var(--bad) 55%,transparent);color:var(--bad)}
+.rxw.eq{background:color-mix(in srgb,var(--muted) 14%,transparent);border-color:color-mix(in srgb,var(--muted) 40%,transparent);color:var(--muted)}
+.rxw.soft{opacity:.75}
+.rxw b i{display:none}
+.mk{margin-left:7px;font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:1px 6px;border-radius:5px;text-transform:uppercase}
+.mk.f{background:color-mix(in srgb,var(--bad) 20%,transparent);color:var(--bad)}
+.mk.s{background:color-mix(in srgb,var(--good) 20%,transparent);color:var(--good)}
+.mk.n{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--bg2)}
+.seg button{border:0;background:transparent;padding:6px 11px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#fff}
+.rxchip b{font-weight:800;color:var(--text);font-size:10.5px;letter-spacing:.2px}
+.rxchip i{font-style:normal;font-weight:900;letter-spacing:-1.5px;font-size:12.5px}
+.rxchip.lv2 i{color:var(--good)}.rxchip.lv1 i{color:var(--good)}
+.rxchip.lv05 i{color:color-mix(in srgb,var(--good) 70%,var(--muted))}
+.rxchip.lvn2 i{color:var(--bad)}.rxchip.lvn1 i{color:var(--bad)}
+.rxchip.lvn05 i{color:color-mix(in srgb,var(--bad) 70%,var(--muted))}
+.rxchip.lv0 i{color:var(--muted2);letter-spacing:0}
+.rxtext{font-size:12px;color:var(--muted);font-style:italic}
+
+/* matriz del detalle */
+.rxtable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.rxtable th,.rxtable td{padding:4px 8px;border-bottom:1px solid var(--border);text-align:left}
+.rxtable th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:800;border-bottom:1px solid var(--border2)}
+.rxtable th.hl{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--accent2);border-radius:5px;text-align:center}
+.rxtable tr.sep td{background:color-mix(in srgb,var(--muted) 12%,transparent);font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:800;padding:3px 8px}
+.rxtable td.a{color:var(--muted)}
+.rxtable td.c{text-align:center;font-weight:900;letter-spacing:-1.5px;font-size:14px;width:78px}
+.rxtable td.c.pos{color:var(--good)}.rxtable td.c.neg{color:var(--bad)}.rxtable td.c.zero{color:var(--muted2);letter-spacing:0}
+.rxtable td.note{font-size:11px;color:var(--muted2);font-weight:400;letter-spacing:0}
+.rxint{font-size:10px;font-weight:700;color:var(--muted2);margin-left:5px;letter-spacing:0}
+.rxhead{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.rxchain{margin:0;padding-left:0;list-style:none;counter-reset:rx}
+.rxchain li{counter-increment:rx;position:relative;padding:4px 0 4px 26px;font-size:12.5px;border-bottom:1px dashed var(--border)}
+.rxchain li:last-child{border-bottom:0}
+.rxchain li::before{content:counter(rx);position:absolute;left:0;top:4px;width:17px;height:17px;border-radius:50%;background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent2);font-size:10.5px;font-weight:800;display:grid;place-items:center}
+.rxchain li b{color:var(--text)}
+.rxstep{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-right:6px}
+.rxpat{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--med);border-radius:8px;padding:9px 12px;font-size:12.5px;color:var(--text);margin-top:8px}
+.rxmkt{background:color-mix(in srgb,var(--good) 8%,var(--panel));border:1px solid var(--border);border-left:3px solid var(--good);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-top:8px}
+.rxbadge{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:6px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent2)}
+.col-left{width:122px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;font-weight:600}
+th.col-left{text-align:right}
+.col-left.soon{color:var(--accent2)}
+@media(min-width:861px){.col-time .left{display:none}}
+@media(max-width:860px){
+  html,body{overflow-x:hidden}
+  .col-left,th.col-left{display:none}
+  thead th{position:static;top:auto}
+  .layout{display:flex;flex-direction:column;padding:14px 10px 50px}
+  main{order:1;width:100%;min-width:0}
+  aside{order:2;width:100%;min-width:0}
+  .tablewrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+  .col-val,th.col-val{display:none}
+  .mini-vals{display:flex;gap:10px;flex-wrap:wrap;margin-top:3px;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .mini-vals b{font-weight:700}
+  .mini-vals b.up{color:var(--good)}.mini-vals b.dn{color:var(--bad)}
+  .mini-vals .lb{color:var(--muted2);font-weight:600;margin-right:3px}
+  .col-time{width:60px}
+  .col-cur{width:40px}
+  .col-imp,th.col-imp{display:none}
+  tbody tr.ev{border-left:4px solid var(--border2)}
+  tbody tr.ev[data-i="1"]{border-left-color:var(--low)}
+  tbody tr.ev[data-i="2"]{border-left-color:var(--med)}
+  tbody tr.ev[data-i="3"]{border-left-color:var(--high)}
+  .curcode{display:none}
+  thead th{font-size:9.5px;letter-spacing:.3px}
+  td,th{padding:6px 7px}
+  .rxmap{padding:5px 7px}
+  .rxline{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  .rxw{font-size:10.5px;padding:1px 5px;gap:4px;justify-content:center}
+  .rxw i{font-size:11px;letter-spacing:-1px}
+    .rxchip{font-size:10.5px}
+  .topbar-in{gap:8px;padding:9px 12px}
+  .brand{order:1}
+  #theme{order:2;margin-left:auto}
+  .search{order:3;flex:1 1 100%}
+  .search input,.search input:focus{width:100%}
+  select.tz{order:4;flex:1 1 auto;max-width:none;min-width:0}
+  .tabs{order:5;flex:1 1 100%;justify-content:space-between}
+  .tab{padding:6px 8px;font-size:12.5px}
+  .clock{display:none}
+  .brand small{display:none}
+  td,th{padding:8px 8px}
+  .filters{gap:8px 10px}
+}
+th.col-val{text-align:right}
+.flag{font-size:15px;margin-right:6px;vertical-align:-1px}
+.curcode{font-weight:700;font-size:12px;letter-spacing:.3px}
+.imp{display:inline-flex;gap:2.5px;align-items:center}
+.imp i{width:9px;height:9px;border-radius:2px;background:var(--border2);display:block}
+.imp[data-i="3"] i.f{background:var(--high)}
+.imp[data-i="2"] i.f{background:var(--med)}
+.imp[data-i="1"] i.f{background:var(--low)}
+.evname{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.evname .tx{font-weight:500}
+.badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1.5px 6px;border-radius:5px;border:1px solid var(--border2);color:var(--muted)}
+.badge.sp{color:#c084fc;border-color:#7c3aed}
+.badge.cb{color:#38bdf8;border-color:#0284c7}
+.badge.hol{color:#fbbf24;border-color:#b45309}
+.badge.corp{color:#34d399;border-color:#059669}
+tr.detail td{background:var(--panel2);padding:0;border-bottom:1px solid var(--border2)}
+.detail-in{padding:13px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 20px}
+.detail-in .full{grid-column:1/-1}
+.detail-in .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin-bottom:3px}
+.detail-in .v{font-size:13px}
+.detail-in .note{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px}
+.surprise{display:inline-flex;align-items:center;gap:6px;font-weight:700;padding:3px 9px;border-radius:999px;font-size:12px}
+.surprise.up{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.surprise.dn{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.surprise.eq{background:color-mix(in srgb,var(--neutral) 20%,transparent);color:var(--neutral)}
+.empty{padding:56px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:34px;margin-bottom:10px}
+
+/* ============================ VARIOS ============================ */
+.legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;padding:10px 13px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+.legend .k{display:inline-flex;align-items:center;gap:6px}
+.legend .box{width:11px;height:11px;border-radius:3px;display:inline-block}
+.srclive{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.3px;
+  padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);white-space:nowrap}
+.srclive.on{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.srclive.off{color:var(--muted2)}
+.srclive.err{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.srcbar{padding:11px 13px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);line-height:1.6}
+.footer{padding:22px 16px 50px;max-width:1680px;margin:0 auto;color:var(--muted2);font-size:12px;line-height:1.7}
+.footer h4{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.7px;margin:0 0 8px}
+.footer ul{margin:0 0 14px;padding-left:18px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:200;padding:20px}
+.modal.open{display:grid}
+.modal .box{background:var(--panel);border:1px solid var(--border2);border-radius:14px;max-width:560px;width:100%;box-shadow:var(--shadow);max-height:88vh;overflow:auto}
+.modal h2{margin:0;padding:14px 18px;font-size:15px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.formgrid{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.formgrid label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.formgrid .full{grid-column:1/-1}
+.formgrid input,.formgrid select,.formgrid textarea{
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;outline:none;font-size:13.5px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--text);
+}
+.formgrid input:focus,.formgrid select:focus,.formgrid textarea:focus{border-color:var(--accent)}
+.modal .actions{padding:0 18px 18px;display:flex;gap:9px;justify-content:flex-end}
+.tooltip{position:fixed;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-size:12px;pointer-events:none;z-index:300;box-shadow:var(--shadow);max-width:320px;display:none}
+.hint{font-size:11.5px;color:var(--muted2);padding:0 14px 12px}
+@media print{
+  .topbar,aside,.filters,.srcbar,.footer,.legend,.col-left,th.col-left{display:none!important}
+  .layout{display:block;padding:0}
+  body{background:#fff;color:#000}
+  .tablewrap{border:0;box-shadow:none}
+  thead th{position:static;color:#000}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="logo">📅</div>
+      <div>Calendario Económico<small id="brandsub">Datos macro · zona horaria configurable</small></div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab" data-range="today">Hoy</button>
+      <button class="tab" data-range="tomorrow">Mañana</button>
+      <button class="tab active" data-range="week">Esta semana</button>
+      <button class="tab" data-range="nextweek">Próxima semana</button>
+      <button class="tab" data-range="month">Este mes</button>
+      <button class="tab" data-range="all">Todo</button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Buscar evento, país, divisa…" aria-label="Buscar">
+    </div>
+
+    <select class="tz" id="tz" aria-label="Zona horaria"></select>
+
+    <div class="clock">
+      <b id="clock">--:--:--</b>
+      <span id="clockzone">—</span>
+    </div>
+
+    <button class="iconbtn" id="theme" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ===================== BARRA LATERAL ===================== -->
+  <aside>
+    <section class="card">
+      <div class="countdown" id="cd">
+        <div class="lbl"><span>Próximo evento de alto impacto</span><span id="cd-imp">●●●</span></div>
+        <div class="nm" id="cd-name">—</div>
+        <div class="meta" id="cd-meta">Sin eventos próximos en el filtro actual</div>
+        <div class="cd-timer" id="cd-timer">--:--:--</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="mini-head">
+        <button id="mprev" aria-label="Mes anterior">‹</button>
+        <b id="mlabel">—</b>
+        <button id="mnext" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="mini-grid" id="mgrid"></div>
+      <div class="hint">Clic en un día para filtrar. Los puntos indican impacto alto / medio / bajo.</div>
+    </section>
+
+    <section class="card">
+      <h3>⏱️ Próximos eventos <span class="spacer" style="flex:1"></span><span id="nextcount" style="color:var(--muted2)"></span></h3>
+      <div class="next-list" id="nextlist"></div>
+    </section>
+
+    <section class="card">
+      <h3>📊 Resumen del periodo</h3>
+      <div class="body" id="stats"></div>
+    </section>
+  </aside>
+
+  <!-- ===================== PRINCIPAL ===================== -->
+  <main>
+    <div class="filters">
+      <div class="fgroup">
+        <label>Impacto</label>
+        <button class="chip imp-h on" data-imp="3"><span class="sq"><i class="f"></i><i class="f"></i><i class="f"></i></span>Alto</button>
+        <button class="chip imp-m on" data-imp="2"><span class="sq"><i class="f"></i><i class="f"></i><i></i></span>Medio</button>
+        <button class="chip imp-l on" data-imp="1"><span class="sq"><i class="f"></i><i></i><i></i></span>Bajo</button>
+      </div>
+
+      <div class="fgroup" style="flex-wrap:wrap">
+        <label>Divisas</label>
+        <span id="curchips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+        <button class="btn" id="allcur" style="padding:4px 10px">Todas</button>
+        <button class="btn" id="nonecur" style="padding:4px 10px">Ninguna</button>
+      </div>
+
+      <div class="spacer"></div>
+
+      <button class="btn" id="rxhelp" title="Cómo se calcula">❔ Cómo se lee</button>
+
+      <label class="toggle"><input type="checkbox" id="onlyup" checked>Solo pendientes</label>
+      <label class="toggle"><input type="checkbox" id="groupdays" checked>Agrupar por día</label>
+
+      <div class="fgroup">
+        <label>Fuente</label>
+        <select class="tz" id="fuente" style="height:32px;max-width:190px">
+          <option value="auto">Automática (en vivo)</option>
+          <option value="vivo">Sólo datos en vivo</option>
+          <option value="curado">Sólo mi calendario</option>
+        </select>
+        <span class="srclive" id="livechip"><span class="dot"></span> comprobando…</span>
+        <button class="btn" id="refreshlive" title="Volver a descargar los datos">🔄</button>
+      </div>
+
+      <div class="fgroup">
+        <button class="btn" id="reset">↺ Limpiar</button>
+        <button class="btn" id="addbtn">＋ Añadir</button>
+        <button class="btn" id="csvbtn">⬇ CSV</button>
+        <button class="btn" id="jsonbtn">⬇ JSON</button>
+        <button class="btn" id="backupbtn" title="Descargar tus eventos propios, datos reales y ajustes">💾 Copia</button>
+        <button class="btn" id="restorebtn" title="Restaurar una copia desde otro dispositivo">♻ Restaurar</button>
+        <input type="file" id="restorefile" accept=".json,application/json" style="display:none">
+        <button class="btn" id="printbtn">🖨 Imprimir</button>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th class="col-time" id="th-time">Hora</th>
+            <th class="col-cur">Divisa</th>
+            <th class="col-imp">Impacto</th>
+            <th class="col-ev">Evento</th>
+            <th class="col-val">Actual</th>
+            <th class="col-val">Previsión</th>
+            <th class="col-val">Previo</th>
+            <th class="col-left">Faltan</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none">
+        <div class="big">🔍</div>
+        <div>No hay eventos que coincidan con los filtros seleccionados.</div>
+      </div>
+      <div class="legend">
+        <span class="k"><span class="box" style="background:var(--high)"></span> Alto impacto</span>
+        <span class="k"><span class="box" style="background:var(--med)"></span> Medio</span>
+        <span class="k"><span class="box" style="background:var(--low)"></span> Bajo</span>
+        <span class="k" style="color:var(--good)">▲ mejor de lo previsto</span>
+        <span class="k" style="color:var(--bad)">▼ peor de lo previsto</span>
+        <span class="k">Clic en una fila para ver el detalle, el mapa completo y la fuente</span>
+        <span class="k" id="rxlegend" style="color:var(--muted2)">🔮 <b>Según la previsión</b> = lo que <i>puede</i> hacer el precio · ⚡ <b>Ya salió</b> = lo que <i>va a</i> hacer con el dato real · <b>SUBE / BAJA FUERTE</b>, normal o <b>DESPACIO</b> · modelo heurístico, no una predicción</span>
+      </div>
+      <div class="srcbar" id="srcbar"></div>
+    </div>
+  </main>
+</div>
+
+<footer class="footer">
+  <h4>Fuentes y metodología</h4>
+  <p>
+    Los eventos, horarios, previsiones y datos publicados de esta edición se han recopilado el <b>14 de octubre de 2026</b>
+    a partir de fuentes públicas. Los horarios se guardan en <b>UTC</b> y se convierten en el navegador a la zona horaria que elijas.
+    Las horas marcadas como <i>orientativas</i> proceden de calendarios de casas de análisis y pueden variar ligeramente.
+  </p>
+  <ul id="srclist"></ul>
+  <p style="color:var(--muted2)">
+    <b>Aviso:</b> herramienta informativa y educativa. No constituye asesoramiento financiero ni recomendación de inversión.
+    Verifica siempre los datos en la fuente oficial (BLS, Eurostat, ONS, banco central correspondiente) antes de operar.
+    Este archivo funciona sin conexión: puedes editarlo, añadir tus propios eventos (se guardan en tu navegador) y exportarlo a CSV/JSON.
+  </p>
+</footer>
+
+<!-- ===================== MODAL AÑADIR EVENTO ===================== -->
+<div class="modal" id="modal">
+  <div class="box">
+    <h2>Añadir evento propio <button class="iconbtn" id="mclose" aria-label="Cerrar">✕</button></h2>
+    <form id="addform">
+      <div class="formgrid">
+        <label class="full">Nombre del evento
+          <input name="n" required placeholder="Ej.: IPC de España (sep) interanual">
+        </label>
+        <label>Fecha y hora (UTC)
+          <input name="d" type="datetime-local" required>
+        </label>
+        <label>Divisa / país
+          <select name="c" id="cursel"></select>
+        </label>
+        <label>Impacto
+          <select name="i"><option value="3">Alto</option><option value="2" selected>Medio</option><option value="1">Bajo</option></select>
+        </label>
+        <label>Categoría
+          <select name="t">
+            <option>Datos macro</option><option>Inflación</option><option>Empleo</option><option>Bancos centrales</option>
+            <option>Vivienda</option><option>Actividad</option><option>Consumo</option><option>Energía</option><option>Fiscal</option><option>Festivos</option>
+          </select>
+        </label>
+        <label>Actual<input name="a" placeholder="p. ej. 3,7%"></label>
+        <label>Previsión<input name="f" placeholder="p. ej. 3,6%"></label>
+        <label>Previo<input name="p" placeholder="p. ej. 3,4%"></label>
+        <label class="full">Notas / contexto
+          <textarea name="note" rows="2" placeholder="Contexto, fuente, interpretación…"></textarea>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="mcancel">Cancelar</button>
+        <button type="submit" class="btn primary">Guardar evento</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="rxmodal">
+  <div class="box" style="max-width:760px">
+    <h2>Cómo leer el mapa de reacción <button class="iconbtn" id="rxclose" aria-label="Cerrar">✕</button></h2>
+    <div style="padding:16px 18px">
+      <p style="margin-top:0;color:var(--muted);font-size:13px">
+        Cada evento tiene <b>dos estados</b> para tus activos (<b>DÓLAR, EUR, GBP, NQ, ES, ORO y WTI</b>):
+      </p>
+      <ul style="font-size:13px;color:var(--muted);margin:0 0 10px;padding-left:20px">
+        <li><b>🔮 Según la previsión · puede hacer</b> (antes de publicarse): compara el consenso con el dato previo.
+            Si el consenso espera que el número suba, el sesgo es al alza y verás lo que <i>puede</i> hacer el precio.
+            Ojo: el consenso ya está descontado en el precio, así que esto es orientativo.</li>
+        <li><b>⚡ Ya salió · va a hacer</b> (en cuanto hay dato): compara el <b>dato real con lo previsto</b> y calcula
+            la dirección de cada activo con el movimiento real.</li>
+      </ul>
+      <p style="color:var(--muted);font-size:13px">
+        El lenguaje es siempre el mismo: <b style="color:var(--good)">SUBE FUERTE</b> / <b style="color:var(--good)">SUBE</b> /
+        <b style="color:var(--good)">SUBE DESPACIO</b> · <b>NEUTRO</b> ·
+        <b style="color:var(--bad)">BAJA DESPACIO</b> / <b style="color:var(--bad)">BAJA</b> / <b style="color:var(--bad)">BAJA FUERTE</b>.
+      </p>
+      <p style="color:var(--muted);font-size:13px">
+        Si el dato todavía no está en el calendario, abre el evento y pulsa <b>✎ Introducir el dato real</b>:
+        en cuanto lo escribas, la línea pasa sola a «ya salió · va a hacer» con el movimiento de cada activo.
+      </p>
+      <h4 style="margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Reglas base que usa el modelo</h4>
+      <table class="rxtable">
+        <tr><th>Escenario</th><th>Divisa del dato</th><th>EUR / GBP</th><th>ES / NQ</th><th>Oro (GC)</th><th>Petróleo (CL)</th></tr>
+        <tr><td class="a">Inflación por encima de lo previsto <span class="rxint">(hawkish)</span></td><td class="c pos">▲</td><td class="c neg">▼▼</td><td class="c neg">▼▼</td><td class="c neg">▼▼</td><td class="c neg">▼</td></tr>
+        <tr><td class="a">Inflación por debajo <span class="rxint">(dovish)</span></td><td class="c neg">▼</td><td class="c pos">▲</td><td class="c pos">▲▲</td><td class="c pos">▲▲</td><td class="c pos">▲</td></tr>
+        <tr><td class="a">Actividad / consumo / PIB por encima</td><td class="c pos">▲</td><td class="c neg">▼ leve</td><td class="c pos">▲</td><td class="c neg">▼ leve</td><td class="c neg">▼</td></tr>
+        <tr><td class="a">Empleo fuerte (EE. UU.)</td><td class="c pos">▲</td><td class="c neg">▼</td><td class="c zero">= mixto</td><td class="c neg">▼</td><td class="c neg">▼</td></tr>
+        <tr><td class="a">Paro / solicitudes por encima de lo previsto</td><td class="c neg">▼</td><td class="c pos">▲</td><td class="c neg">▼</td><td class="c pos">▲</td><td class="c pos">▲</td></tr>
+        <tr><td class="a">Banco central más duro de lo esperado</td><td class="c pos">▲▲</td><td class="c neg">▼</td><td class="c neg">▼▼</td><td class="c neg">▼▼</td><td class="c neg">▼▼</td></tr>
+        <tr><td class="a">Inventarios de crudo al alza <span class="rxint">(EIA)</span></td><td class="c zero">=</td><td class="c zero">=</td><td class="c zero">=</td><td class="c zero">=</td><td class="c neg">▼▼</td></tr>
+      </table>
+      <p style="font-size:12px;color:var(--muted2);margin-bottom:0">
+        El modelo es <b>simétrico</b>: la columna "dato a la baja" es el espejo de "dato al alza". Además,
+        los eventos que no son de EE. UU. pesan menos sobre los activos estadounidenses (S&P 500, Nasdaq, oro, T-Note)
+        y más sobre su propio mercado (por ejemplo, un dato alemán mueve más al DAX que al S&P 500).
+        <b>Importante:</b> esto describe la reacción <i>típica</i> y mecánica. En la práctica manda lo que ya esté
+        descontado en el precio, el posicionamiento y el régimen de mercado; una sorpresa puede provocar el movimiento
+        contrario si el mercado ya la había anticipado. Úsalo como brújula, nunca como señal de entrada.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tip"></div>
+
+<script>
+/* ==========================================================================
+   1. DATOS
+   Impacto: 3 = alto, 2 = medio, 1 = bajo
+   a/f/p   = actual / previsión / previo   (texto tal cual se publica)
+   hib     = "higher is better" → sirve para colorear la sorpresa
+   k       = tipo: data | cb | speech | holiday | earnings | report
+   approx  = true si la hora es orientativa
+   ========================================================================== */
+const SRC = {
+  nq:  { t:"Newsquawk · Week in Focus 12-16 oct 2026", u:"https://www.newsquawk.com/headlines/week-in-focus-12-16th-october-2026-us-cpi-us-retail-sales-start-of-q3-earnings-china-cpi-uk-jobs-rba-minutes-and-aussie-jobs" },
+  scot:{ t:"Scotiabank · Calendario de publicaciones (octubre 2026)", u:"https://www.scotiabank.com/ca/en/about/economics/economics-publications/post.other-publications.calendar-of-economic-release-dates.calendar-of-economic-release-dates--october-2026-.html" },
+  te:  { t:"Trading Economics · US CPI septiembre 2026", u:"https://tradingeconomics.com/united-states/inflation-rate-mom/news/591944" },
+  et:  { t:"etnet · Agenda macro del jueves 15 de octubre", u:"https://news.etnet.com.hk/www/eng/futures/futures_news_detail.php?newsid=2026101456&page=1" },
+  am:  { t:"Admiral Markets · Previsión de ventas minoristas EE. UU. (sep 2026)", u:"https://admiralmarkets.com/analytics/traders-blog/us-retail-sales-september-2026-preview" },
+  tec: { t:"Trading Economics · calendario económico (UTC)", u:"https://tradingeconomics.com/calendar" },
+  pmi: { t:"S&P Global · calendario oficial de publicación de PMI", u:"https://www.pmi.spglobal.com/public/release/releasedates?language=en" },
+  boj: { t:"Banco de Japón · calendario de publicaciones", u:"https://www.boj.or.jp/en/about/calendar/" },
+  fed: { t:"Fed de Atlanta · periodos de blackout del FOMC", u:"https://www.atlantafed.org/news-and-events/press-room/blackout-periods" },
+  cash:{ t:"cash.ch · Cierre de Wall Street 14-oct-2026 (Nasdaq 100 −0,9%)", u:"https://www.cash.ch/news/aktien-new-york-unerwartet-hohe-inflation-belastet-techwerte-976722" },
+  usg: { t:"USAGOLD · Informe de metales preciosos 14-oct-2026", u:"https://www.usagold.com/daily-precious-metals-market-report-october-14-2026/" }
+};
+
+const EVENTS = [
+  /* ---------------------------- LUNES 12 ---------------------------- */
+  {d:"2026-10-12T12:00:00Z", allDay:true, c:"CAD", n:"Día de Acción de Gracias (festivo)", i:1, k:"holiday", t:"Festivos", note:"Mercados canadienses cerrados. Semana arranca sin datos relevantes.", src:"nq"},
+  {d:"2026-10-12T12:00:00Z", allDay:true, c:"USD", n:"Día de Colón (festivo)", i:1, k:"holiday", t:"Festivos", note:"Festivo federal en EE. UU.: mercados de bonos cerrados, la bolsa de Nueva York opera con normalidad."},
+
+  /* ---------------------------- MARTES 13 ---------------------------- */
+  {d:"2026-10-13T00:30:00Z", c:"AUD", n:"Actas del RBA (reunión de septiembre)", i:3, k:"cb", t:"Bancos centrales",
+   note:"El RBA subió los tipos +25 pb hasta 4,60% en septiembre por decisión unánime, con tono hawkish: la inflación sigue elevada y parte de los riesgos al alza ya se están materializando. Bullock se mostró algo más dovish en rueda de prensa.", src:"nq"},
+  {d:"2026-10-13T06:00:00Z", c:"EUR", n:"IPC final de Alemania (sep)", i:2, k:"data", t:"Inflación", approx:true},
+  {d:"2026-10-13T11:00:00Z", c:"USD", n:"Arranque de la temporada de resultados del 3T (JPM, GS, C, WFC)", i:2, k:"earnings", t:"Empresas",
+   note:"FactSet espera un crecimiento de beneficios del S&P 500 del +29,5% interanual en el 3T, el tercer trimestre consecutivo por encima del 25%. Los grandes bancos marcan la plantilla para el sector.", src:"nq"},
+  {d:"2026-10-13T12:00:00Z", c:"OPEP", n:"Informe mensual de la OPEP (MOMR)", i:1, k:"report", t:"Energía"},
+  {d:"2026-10-13T14:00:00Z", c:"USD", n:"Ventas de viviendas de segunda mano (sep)", i:2, k:"data", t:"Vivienda", src:"scot"},
+  {d:"2026-10-13T18:00:00Z", c:"USD", n:"Declaración del Tesoro de EE. UU. (sep)", i:1, k:"data", t:"Fiscal", src:"scot"},
+  {d:"2026-10-13T23:50:00Z", c:"JPY", n:"IPP / CGPI de Japón (sep)", i:2, k:"data", t:"Inflación", approx:true, src:"nq"},
+
+  /* ---------------------------- MIÉRCOLES 14 ---------------------------- */
+  {d:"2026-10-14T01:30:00Z", c:"CNY", n:"IPC de China (sep) interanual", i:3, k:"data", t:"Inflación", f:"0,9%", p:"0,8%", hib:false,
+   note:"Se esperaba un repunte hasta ~0,9-1,0% a/a apoyado en la energía, con la presión subyacente todavía débil por la atonía del consumo y el lastre inmobiliario. Un dato flojo reforzaría los argumentos a favor de más estímulos en Pekín.", src:"nq"},
+  {d:"2026-10-14T01:30:00Z", c:"CNY", n:"IPP de China (sep) interanual", i:2, k:"data", t:"Inflación", f:"3,8%", p:"3,8%", hib:false,
+   note:"La divergencia entre unos precios de fábrica elevados y una escasa traslación al consumidor sigue siendo el tema clave para el mercado.", src:"nq"},
+  {d:"2026-10-14T06:00:00Z", c:"EUR", n:"Precios mayoristas de Alemania (sep)", i:1, k:"data", t:"Inflación", approx:true, src:"nq"},
+  {d:"2026-10-14T08:00:00Z", c:"EUR", n:"Informe mensual de la AIE (Oil Market Report)", i:1, k:"report", t:"Energía", approx:true},
+  {d:"2026-10-14T15:00:00Z", c:"USD", n:"Anuncio de recompra del Tesoro de EE. UU. (tramos 10-20 años)", i:2, k:"data", t:"Fiscal", approx:true,
+   note:"El Tesoro anuncia el importe máximo que pretende comprar en cupones nominales a 10-20 años, con la operación al día siguiente. La guía actual es de al menos 4.000 M$; las operaciones previas en este tramo se han dimensionado en 6.000 M$.", src:"nq"},
+  {d:"2026-10-14T12:30:00Z", c:"USD", n:"IPC (sep) interanual", i:3, k:"data", t:"Inflación", a:"3,7%", f:"3,6%", p:"3,4%", hib:false,
+   note:"PUBLICADO: 3,7% a/a frente al 3,6% esperado y 3,4% previo. La energía subió un 5,2% y la gasolina un 9,1%, más de la mitad del incremento del índice. El dato aleja la posibilidad de un recorte y complica el mensaje de la Fed.", src:"te",
+   mkt:"Reacción real del mercado ese día (14-oct-2026): <b>Nasdaq 100 −0,9%</b> hasta 30.283; <b>S&amp;P 500 −0,7%</b> hasta 7.753; <b>Dow Jones −0,1%</b> hasta 51.623; <b>oro spot −1,45%</b> (≈4.105 $ la onza, tercera sesión consecutiva de caída) y la plata con caídas mucho mayores (en torno al −6% al cierre de la sesión); el rendimiento del T-Note a 10 años se fue hacia el 5,2%. El Nasdaq cayó más que el S&amp;P porque la tecnología es el sector de mayor duración: sus beneficios están más lejos en el tiempo y los descuenta más fuerte cualquier subida de tipos.",
+   mktSrc:["cash","usg"]},
+  {d:"2026-10-14T12:30:00Z", c:"USD", n:"IPC (sep) mensual", i:3, k:"data", t:"Inflación", a:"0,6%", f:"0,6%", p:"0,4%", hib:false,
+   note:"PUBLICADO: +0,6% m/m, en línea con lo esperado y la mayor subida mensual desde abril. Vivienda +0,4%; alimentos sin cambios.", src:"te"},
+  {d:"2026-10-14T12:30:00Z", c:"USD", n:"IPC subyacente (sep) interanual", i:3, k:"data", t:"Inflación", a:"2,6%", f:"2,5%", p:"2,4%", hib:false,
+   note:"PUBLICADO: 2,6% a/a, por encima del 2,5% previsto y del 2,4% anterior.", src:"te"},
+  {d:"2026-10-14T12:30:00Z", c:"USD", n:"IPC subyacente (sep) mensual", i:3, k:"data", t:"Inflación", a:"0,3%", f:"0,2%", p:"0,3%", hib:false,
+   note:"PUBLICADO: +0,3% m/m frente al +0,2% esperado. Bienes y servicios suben a la vez: es la parte del informe que más incomoda a la Fed.", src:"te"},
+  {d:"2026-10-14T12:30:00Z", c:"CAD", n:"Permisos de construcción de Canadá (ago)", i:1, k:"data", t:"Vivienda", src:"scot"},
+  {d:"2026-10-14T18:00:00Z", c:"USD", n:"Libro Beige de la Fed", i:2, k:"cb", t:"Bancos centrales",
+   note:"Resumen de condiciones económicas por distritos de la Reserva Federal. Sirve de base para el FOMC del 28 de octubre.", src:"scot"},
+  {d:"2026-10-14T23:50:00Z", c:"JPY", n:"Pedidos de maquinaria de Japón (ago)", i:1, k:"data", t:"Actividad", approx:true, src:"scot"},
+
+  /* ---------------------------- JUEVES 15 ---------------------------- */
+  {d:"2026-10-15T00:30:00Z", c:"AUD", n:"Cambio en el empleo de Australia (sep)", i:3, k:"data", t:"Empleo", f:"+20K", p:"+39,5K", hib:true,
+   note:"Se espera una desaceleración de la creación de empleo. Un dato fuerte refuerza el sesgo de tipos altos del RBA; un repunte del paro daría evidencia de holgura en el mercado laboral.", src:"nq"},
+  {d:"2026-10-15T00:30:00Z", c:"AUD", n:"Tasa de desempleo de Australia (sep)", i:3, k:"data", t:"Empleo", f:"4,6%", p:"4,6%", hib:false, src:"nq"},
+  {d:"2026-10-15T00:30:00Z", c:"AUD", n:"Tasa de participación de Australia (sep)", i:2, k:"data", t:"Empleo", f:"67,0%", p:"67,1%", hib:true, src:"nq"},
+  {d:"2026-10-15T01:30:00Z", c:"JPY", n:"Discurso de Junko Koike (consejera del BoJ)", i:1, k:"speech", t:"Bancos centrales", src:"et"},
+  {d:"2026-10-15T02:45:00Z", c:"EUR", n:"Discurso de Claudia Buch (supervisión bancaria del BCE)", i:1, k:"speech", t:"Bancos centrales", src:"et"},
+  {d:"2026-10-15T02:55:00Z", c:"USD", n:"Discurso de Michelle Bowman (Fed)", i:2, k:"speech", t:"Bancos centrales",
+   note:"Bowman, votante, ve «poca urgencia» para volver a mover los tipos. Sus comentarios llegan justo después de un IPC caliente.", src:"nq"},
+  {d:"2026-10-15T03:40:00Z", c:"GBP", n:"Discurso de Huw Pill (economista jefe del BoE)", i:2, k:"speech", t:"Bancos centrales", src:"et"},
+  {d:"2026-10-15T04:30:00Z", c:"JPY", n:"Producción industrial de Japón (ago, final) y utilización de capacidad", i:1, k:"data", t:"Actividad", src:"et"},
+  {d:"2026-10-15T06:00:00Z", c:"GBP", n:"PIB mensual del Reino Unido (ago)", i:3, k:"data", t:"Actividad", f:"-0,3% / -0,4%", p:"+0,4%", hib:true,
+   note:"Se espera una corrección tras dos meses consecutivos al +0,4%, con el sector servicios como principal lastre. La economía sigue siendo lo bastante sólida como para no impedir al BoE endurecer en alguna de las dos últimas reuniones de 2026.", src:"nq"},
+  {d:"2026-10-15T06:00:00Z", c:"GBP", n:"Índice de servicios del Reino Unido (ago) mensual", i:2, k:"data", t:"Actividad", f:"-0,1%", p:"+0,4%", hib:true, src:"et"},
+  {d:"2026-10-15T06:00:00Z", c:"GBP", n:"Producción industrial del Reino Unido (ago) mensual", i:2, k:"data", t:"Actividad", f:"-0,1%", p:"+0,2%", hib:true, src:"et"},
+  {d:"2026-10-15T06:00:00Z", c:"GBP", n:"Producción industrial del Reino Unido (ago) interanual", i:1, k:"data", t:"Actividad", f:"+0,7%", p:"+0,6%", hib:true, src:"et"},
+  {d:"2026-10-15T06:00:00Z", c:"GBP", n:"Balanza comercial del Reino Unido (ago)", i:1, k:"data", t:"Comercio", src:"scot"},
+  {d:"2026-10-15T06:45:00Z", c:"EUR", n:"IPC final de Francia (sep)", i:1, k:"data", t:"Inflación", src:"nq"},
+  {d:"2026-10-15T06:45:00Z", c:"GBP", n:"Discurso de Megan Greene (MPC del BoE)", i:1, k:"speech", t:"Bancos centrales", approx:true, src:"et"},
+  {d:"2026-10-15T08:45:00Z", c:"GBP", n:"Discurso de Ben Broadbent (vicegobernador del BoE)", i:2, k:"speech", t:"Bancos centrales", src:"et"},
+  {d:"2026-10-15T09:00:00Z", c:"EUR", n:"Producción industrial de la eurozona (ago) mensual", i:2, k:"data", t:"Actividad", f:"0,0%", hib:true, src:"et"},
+  {d:"2026-10-15T09:00:00Z", c:"EUR", n:"Producción industrial de la eurozona (ago) interanual", i:1, k:"data", t:"Actividad", f:"-0,1%", hib:true, src:"et"},
+  {d:"2026-10-15T10:00:00Z", c:"GBP", n:"Discurso de Andrew Bailey (gobernador del BoE)", i:2, k:"speech", t:"Bancos centrales", src:"et"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"IPP (sep) mensual", i:3, k:"data", t:"Inflación", f:"+0,5%", p:"+0,4%", hib:false,
+   note:"Las previsiones difieren entre fuentes: Newsquawk espera +0,5% m/m y el 5,3% a/a; etnet recoge +0,6% m/m y 5,4% a/a.", src:"nq"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"IPP (sep) interanual", i:3, k:"data", t:"Inflación", f:"5,3%", p:"5,4%", hib:false,
+   note:"Se espera un ligero descenso desde el 5,4%. Con el IPC ya caliente, un IPP por encima de lo previsto presionaría aún más la curva de tipos.", src:"nq"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Ventas minoristas (sep) mensual", i:3, k:"data", t:"Consumo", f:"+0,3%", p:"+1,1%", hib:true,
+   note:"Se espera una fuerte moderación tras el +1,1% de agosto. El RedBook apunta a cierta pérdida de impulso, aunque la encuesta de Bank of America muestra un gasto sólido con tarjetas (+6,2% a/a). Dato reportado en términos desestacionalizados pero SIN ajustar por inflación.", src:"nq"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Ventas minoristas · grupo de control (sep)", i:3, k:"data", t:"Consumo", f:"+0,3%", p:"+1,2%", hib:true,
+   note:"El grupo de control es el que se incorpora al cálculo del PIB: más relevante para el mercado que el titular.", src:"nq"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Solicitudes iniciales de subsidio por desempleo", i:2, k:"data", t:"Empleo", f:"200K", p:"197K", hib:false, src:"et"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Solicitudes continuadas de subsidio por desempleo", i:2, k:"data", t:"Empleo", f:"1,709M", p:"1,716M", hib:false, src:"et"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Índice manufacturero Empire State (oct)", i:2, k:"data", t:"Actividad", f:"12,3", p:"7,6", hib:true, src:"et"},
+  {d:"2026-10-15T12:30:00Z", c:"USD", n:"Índice manufacturero de la Fed de Filadelfia (oct)", i:2, k:"data", t:"Actividad", src:"scot"},
+  {d:"2026-10-15T12:30:00Z", c:"CAD", n:"Envíos manufactureros y comercio mayorista de Canadá (ago)", i:1, k:"data", t:"Actividad", src:"scot"},
+  {d:"2026-10-15T14:00:00Z", c:"USD", n:"Inventarios empresariales (ago)", i:1, k:"data", t:"Actividad", src:"scot"},
+  {d:"2026-10-15T16:00:00Z", c:"CAD", n:"Panel de la vicegobernadora del BoC, Carolyn Rogers", i:1, k:"speech", t:"Bancos centrales", approx:true, src:"et"},
+
+  /* ---------------------------- VIERNES 16 ---------------------------- */
+  {d:"2026-10-16T06:00:00Z", c:"EUR", n:"IPC final de Italia (sep)", i:1, k:"data", t:"Inflación", src:"scot"},
+  {d:"2026-10-16T09:00:00Z", c:"EUR", n:"IPC final de la eurozona (sep)", i:2, k:"data", t:"Inflación", approx:true, src:"scot"},
+  {d:"2026-10-16T09:00:00Z", c:"EUR", n:"Balanza comercial de la eurozona (ago)", i:1, k:"data", t:"Comercio", approx:true, src:"scot"},
+  {d:"2026-10-16T09:00:00Z", c:"CAD", n:"Ventas de viviendas MLS de Canadá (sep)", i:1, k:"data", t:"Vivienda", src:"scot"},
+  {d:"2026-10-16T12:15:00Z", c:"CAD", n:"Inicios de vivienda de Canadá (sep)", i:1, k:"data", t:"Vivienda", src:"scot"},
+  {d:"2026-10-16T12:30:00Z", c:"CAD", n:"Transacciones internacionales de valores de Canadá (ago)", i:1, k:"data", t:"Fiscal", src:"scot"},
+  {d:"2026-10-16T12:30:00Z", c:"USD", n:"Precios de exportación e importación de EE. UU. (sep)", i:1, k:"data", t:"Inflación", src:"scot"},
+  {d:"2026-10-16T13:15:00Z", c:"USD", n:"Producción industrial y utilización de capacidad (sep)", i:2, k:"data", t:"Actividad", src:"scot"},
+  {d:"2026-10-16T03:30:00Z", c:"USD", n:"Discurso del presidente de la Fed (Warsh)", i:3, k:"speech", t:"Bancos centrales", approx:true,
+   note:"Último discurso de la Fed antes del blackout del 17 al 29 de octubre. Con el IPC de septiembre en el 3,7%, el mercado buscará cualquier matiz sobre la reunión del 28 de octubre.", src:"nq"},
+  {d:"2026-10-16T20:00:00Z", c:"USD", n:"Flujos de cartera extranjeros hacia EE. UU. (ago)", i:1, k:"data", t:"Fiscal", src:"scot"},
+
+  /* ---------------------------- SEMANA DEL 19 AL 23 ---------------------------- */
+  {d:"2026-10-19T03:30:00Z", c:"CNY", n:"Índice de precios de la vivienda nueva en China (sep) interanual", i:1, k:"data", t:"Vivienda", approx:true, src:"tec"},
+  {d:"2026-10-19T04:00:00Z", c:"CNY", n:"PIB de China (3T) interanual", i:3, k:"data", t:"Actividad", f:"5,2% (modelo TE)", p:"4,3%", hib:true,
+   note:"El dato de crecimiento más seguido de la semana en Asia. Se publica junto al resto del bloque mensual chino.", src:"tec"},
+  {d:"2026-10-19T04:00:00Z", c:"CNY", n:"Producción industrial de China (sep) interanual", i:3, k:"data", t:"Actividad", f:"4,8% (modelo TE)", p:"5,2%", hib:true, src:"tec"},
+  {d:"2026-10-19T04:00:00Z", c:"CNY", n:"Ventas minoristas de China (sep) interanual", i:3, k:"data", t:"Consumo", f:"1,0% (modelo TE)", p:"0,4%", hib:true,
+   note:"El consumo chino sigue siendo el punto más débil de la recuperación: cualquier lectura por debajo de lo esperado reactiva las expectativas de estímulo.", src:"tec"},
+  {d:"2026-10-19T04:00:00Z", c:"CNY", n:"Inversión en activos fijos de China (sep, acumulado) interanual", i:2, k:"data", t:"Actividad", f:"-6,5% (modelo TE)", p:"-7,2%", hib:true, src:"tec"},
+  {d:"2026-10-19T12:30:00Z", c:"CAD", n:"IPC de Canadá (sep) interanual", i:3, k:"data", t:"Inflación", f:"3,2% (modelo TE)", p:"3,0%", hib:false,
+   note:"Dato clave para el BoC, que decide el 28 de octubre. La inflación sigue por encima del objetivo aunque el mercado laboral se está deteriorando con fuerza.", src:"scot"},
+  {d:"2026-10-19T12:30:00Z", c:"CAD", n:"IPC de Canadá (sep) mensual", i:3, k:"data", t:"Inflación", hib:false, src:"scot"},
+  {d:"2026-10-19T12:30:00Z", c:"CAD", n:"IPC subyacente del BoC (sep) interanual (recortada y mediana)", i:3, k:"data", t:"Inflación", f:"2,4% (modelo TE)", p:"2,4%", hib:false, src:"tec"},
+  {d:"2026-10-19T14:00:00Z", c:"USD", n:"Índice del mercado inmobiliario NAHB (oct)", i:2, k:"data", t:"Vivienda", f:"31 (modelo TE)", p:"32", hib:true, src:"tec"},
+  {d:"2026-10-19T14:30:00Z", c:"CAD", n:"Encuesta de perspectivas empresariales del BoC (3T)", i:3, k:"cb", t:"Bancos centrales",
+   note:"Junto con la encuesta de expectativas de los consumidores, es el insumo cualitativo clave de cara a la decisión del BoC del 28 de octubre.", src:"tec"},
+  {d:"2026-10-19T14:30:00Z", c:"CAD", n:"Encuesta de expectativas de los consumidores del BoC (3T)", i:2, k:"cb", t:"Bancos centrales", src:"tec"},
+  {d:"2026-10-20T03:15:00Z", c:"CNY", n:"Tipo preferente de préstamo del PBoC (LPR) a 1 año", i:2, k:"cb", t:"Bancos centrales", f:"3,00% (modelo TE)", p:"3,00%", src:"tec"},
+  {d:"2026-10-20T06:00:00Z", c:"GBP", n:"Tasa de desempleo ILO del Reino Unido (ago)", i:3, k:"data", t:"Empleo", p:"4,9%", hib:false,
+   note:"El mercado laboral británico es la otra pata del mandato del BoE de cara a las dos últimas reuniones de 2026.", src:"tec"},
+  {d:"2026-10-20T06:00:00Z", c:"GBP", n:"Solicitudes de subsidio por desempleo del Reino Unido (sep)", i:3, k:"data", t:"Empleo", f:"+20K (modelo TE)", p:"+27,8K", hib:false, src:"tec"},
+  {d:"2026-10-20T06:00:00Z", c:"GBP", n:"Salario medio del Reino Unido (ago) con primas, 3M interanual", i:2, k:"data", t:"Empleo", p:"3,9%", hib:true, src:"tec"},
+  {d:"2026-10-20T06:00:00Z", c:"GBP", n:"Salario medio del Reino Unido (ago) sin primas, 3M interanual", i:2, k:"data", t:"Empleo", p:"3,5%", hib:true, src:"tec"},
+  {d:"2026-10-20T06:00:00Z", c:"EUR", n:"IPP de Alemania (sep) interanual", i:2, k:"data", t:"Inflación", f:"5,0% (modelo TE)", p:"4,6%", hib:false, approx:true, src:"tec"},
+  {d:"2026-10-20T08:00:00Z", c:"EUR", n:"Cuenta corriente de la eurozona (ago), desestacionalizada", i:2, k:"data", t:"Comercio", f:"16,9 mM € (modelo TE)", p:"36,5 mM €", hib:true, src:"tec"},
+  {d:"2026-10-20T09:00:00Z", c:"EUR", n:"Índice ZEW de sentimiento económico de Alemania (oct)", i:2, k:"data", t:"Actividad", f:"25,1 (modelo TE)", p:"34,7", hib:true, src:"tec"},
+  {d:"2026-10-20T09:00:00Z", c:"EUR", n:"Índice ZEW de situación actual de Alemania (oct)", i:2, k:"data", t:"Actividad", f:"-48 (modelo TE)", p:"-47,1", hib:true, src:"tec"},
+  {d:"2026-10-20T09:00:00Z", c:"EUR", n:"Índice ZEW de sentimiento económico de la eurozona (oct)", i:1, k:"data", t:"Actividad", f:"15 (modelo TE)", p:"25,8", hib:true, src:"tec"},
+  {d:"2026-10-20T12:30:00Z", c:"USD", n:"Inicios de vivienda (sep) y permisos de construcción", i:2, k:"data", t:"Vivienda", f:"1,30M (modelo TE)", p:"1,275M", hib:true, src:"tec"},
+  {d:"2026-10-20T14:00:00Z", c:"USD", n:"Ventas de viviendas pendientes (sep) mensual", i:2, k:"data", t:"Vivienda", f:"+0,2% (modelo TE)", p:"+0,3%", hib:true, src:"tec"},
+  {d:"2026-10-20T23:50:00Z", c:"JPY", n:"Balanza comercial de Japón (sep)", i:3, k:"data", t:"Comercio", f:"-250 mM ¥ (modelo TE)", p:"-1.105,6 mM ¥", hib:true,
+   note:"Se publica a las 08:50 JST del miércoles 21, aunque en horario UTC cae en la noche del martes 20.", src:"tec"},
+  {d:"2026-10-20T23:50:00Z", c:"JPY", n:"Exportaciones de Japón (sep) interanual", i:2, k:"data", t:"Comercio", p:"+19,3%", hib:true, src:"tec"},
+  {d:"2026-10-20T23:50:00Z", c:"JPY", n:"Importaciones de Japón (sep) interanual", i:2, k:"data", t:"Comercio", p:"+28,0%", hib:true, src:"tec"},
+  {d:"2026-10-21T06:00:00Z", c:"GBP", n:"IPC del Reino Unido (sep) interanual", i:3, k:"data", t:"Inflación", f:"3,4% (modelo TE, sin consenso de mercado)", p:"3,1%", hib:false,
+   note:"Uno de los grandes eventos de la semana. El mercado venía descontando en torno a cuatro subidas del BoE en los próximos doce meses y el economista jefe del BoE, Huw Pill, rechazó esa valoración el 14 de octubre: una sorpresa al alza repreciaría toda la curva de gilts y la libra.", src:"tec"},
+  {d:"2026-10-21T06:00:00Z", c:"GBP", n:"IPC subyacente del Reino Unido (sep) interanual", i:3, k:"data", t:"Inflación", f:"2,7% (modelo TE)", p:"2,6%", hib:false, src:"tec"},
+  {d:"2026-10-21T06:00:00Z", c:"GBP", n:"IPC del Reino Unido (sep) mensual", i:3, k:"data", t:"Inflación", f:"+0,3% (modelo TE)", p:"+0,5%", hib:false, src:"tec"},
+  {d:"2026-10-21T06:00:00Z", c:"GBP", n:"IPC subyacente del Reino Unido (sep) mensual", i:3, k:"data", t:"Inflación", f:"+0,1% (modelo TE)", p:"+0,3%", hib:false, src:"tec"},
+  {d:"2026-10-21T06:00:00Z", c:"GBP", n:"Endeudamiento neto del sector público británico (sep, sin bancos)", i:2, k:"data", t:"Fiscal", f:"-13,2 mM £ (modelo TE)", p:"-18,3 mM £", hib:true,
+   note:"Lectura fiscal previa al Presupuesto de Otoño (previsto para finales de noviembre).", src:"tec"},
+  {d:"2026-10-21T16:30:00Z", c:"USD", n:"Variación semanal de existencias de crudo (EIA)", i:2, k:"data", t:"Energía", src:"tec"},
+  {d:"2026-10-22T12:30:00Z", c:"CAD", n:"IPPI y RMPI de Canadá (sep)", i:1, k:"data", t:"Inflación", src:"scot"},
+  {d:"2026-10-22T14:00:00Z", c:"USD", n:"Indicadores adelantados de EE. UU. (sep)", i:1, k:"data", t:"Actividad", approx:true,
+   note:"Scotiabank lo incluye en su calendario, pero no se ha encontrado consenso ni dato previo: posible discontinuación del índice. Trátalo como no confirmado.", src:"scot"},
+  {d:"2026-10-22T14:00:00Z", c:"EUR", n:"Confianza del consumidor de la eurozona (oct, preliminar)", i:2, k:"data", t:"Consumo", f:"-17 (modelo TE)", p:"-16,5", hib:true, src:"tec"},
+  {d:"2026-10-22T14:00:00Z", c:"EUR", n:"Discurso de Fabio Panetta (BCE)", i:2, k:"speech", t:"Bancos centrales",
+   note:"El BCE no está en blackout (decide el 29 de octubre), así que los discursos de esta semana sirven de posicionamiento previo.", src:"tec"},
+  {d:"2026-10-22T23:30:00Z", c:"JPY", n:"IPC de Japón (sep)", i:3, k:"data", t:"Inflación", hib:false,
+   note:"Clave para calibrar la presión sobre el BoJ y el riesgo de intervención en el yen.", src:"scot"},
+  {d:"2026-10-22T22:00:00Z", c:"AUD", n:"PMI flash de Australia (oct)", i:2, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T00:30:00Z", c:"JPY", n:"PMI flash de Japón (oct)", i:2, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T01:01:00Z", c:"GBP", n:"Confianza del consumidor GfK del Reino Unido (oct)", i:2, k:"data", t:"Consumo", p:"-13", hib:true, src:"tec"},
+  {d:"2026-10-23T06:00:00Z", c:"GBP", n:"Ventas minoristas del Reino Unido (sep)", i:2, k:"data", t:"Consumo", hib:true, src:"scot"},
+  {d:"2026-10-23T07:15:00Z", c:"EUR", n:"PMI flash de Francia (oct)", i:2, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T07:30:00Z", c:"EUR", n:"PMI flash de Alemania (oct)", i:3, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T08:00:00Z", c:"EUR", n:"PMI flash de la eurozona (oct)", i:3, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T08:30:00Z", c:"GBP", n:"PMI flash del Reino Unido (oct)", i:3, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T12:30:00Z", c:"CAD", n:"Ventas minoristas de Canadá (ago) mensual", i:3, k:"data", t:"Consumo", f:"+1,3%", p:"-0,7% (jul, final)", hib:true,
+   note:"El mismo día se publica la estimación adelantada de septiembre (+0,3% esperado).", src:"tec"},
+  {d:"2026-10-23T12:30:00Z", c:"CAD", n:"Ventas minoristas de Canadá (sep, estimación adelantada) mensual", i:2, k:"data", t:"Consumo", f:"+0,3%", hib:true, src:"tec"},
+  {d:"2026-10-23T13:45:00Z", c:"USD", n:"PMI flash de EE. UU. (oct)", i:3, k:"data", t:"Actividad", hib:true, approx:true, src:"pmi"},
+  {d:"2026-10-23T14:00:00Z", c:"USD", n:"Confianza del consumidor de la Universidad de Michigan (oct, final)", i:2, k:"data", t:"Consumo", f:"46,3", p:"46,3 (preliminar oct)", hib:true, src:"tec"},
+  {d:"2026-10-23T14:00:00Z", c:"USD", n:"Expectativas de inflación a 5 años de Michigan (oct, final)", i:2, k:"data", t:"Inflación", f:"3,5%", p:"3,5%", hib:false, src:"tec"},
+  {d:"2026-10-23T14:00:00Z", c:"USD", n:"Expectativas de inflación a 1 año de Michigan (oct, final)", i:2, k:"data", t:"Inflación", f:"4,7%", p:"4,7%", hib:false, src:"tec"},
+
+  /* ---------------------------- SEMANA DEL 26 AL 30 ---------------------------- */
+  {d:"2026-10-26T10:00:00Z", c:"EUR", n:"Índice IFO de clima empresarial de Alemania (oct)", i:3, k:"data", t:"Actividad",
+   note:"El IFO es el termómetro más seguido de la economía alemana. Se publican también las expectativas y la valoración de la situación actual.", src:"tec"},
+  {d:"2026-10-26T11:00:00Z", c:"GBP", n:"Ventas minoristas CBI del Reino Unido (oct)", i:2, k:"data", t:"Consumo", f:"-50 (modelo TE)", p:"-55", hib:true, src:"tec"},
+  {d:"2026-10-26T13:30:00Z", c:"USD", n:"Índice nacional de actividad de la Fed de Chicago (sep)", i:1, k:"data", t:"Actividad", f:"-0,1 (modelo TE)", p:"-0,04", hib:true, src:"tec"},
+  {d:"2026-10-26T14:30:00Z", c:"USD", n:"Índice manufacturero de la Fed de Dallas (oct)", i:1, k:"data", t:"Actividad", p:"9,8", hib:true, src:"tec"},
+  {d:"2026-10-27T07:00:00Z", c:"EUR", n:"Tasa de desempleo de España (3T)", i:2, k:"data", t:"Empleo", f:"10,1% (modelo TE)", p:"9,87%", hib:false, src:"tec"},
+  {d:"2026-10-27T09:00:00Z", c:"EUR", n:"Encuesta del BCE sobre préstamos bancarios", i:3, k:"cb", t:"Bancos centrales",
+   note:"Dos días antes de la decisión del BCE: mide la transmisión de la política monetaria al crédito.", src:"tec"},
+  {d:"2026-10-27T10:00:00Z", c:"EUR", n:"Masa monetaria M3 de la eurozona (sep) interanual", i:1, k:"data", t:"Actividad", p:"3,5%", hib:true, src:"tec"},
+  {d:"2026-10-27T12:30:00Z", c:"USD", n:"Pedidos de bienes duraderos (sep, preliminar) mensual", i:2, k:"data", t:"Actividad", f:"+0,2% (modelo TE)", p:"0,0%", hib:true, src:"tec"},
+  {d:"2026-10-27T12:30:00Z", c:"USD", n:"Pedidos de bienes duraderos ex-transporte (sep) mensual", i:2, k:"data", t:"Actividad", f:"+0,3% (modelo TE)", p:"+0,3%", hib:true, src:"tec"},
+  {d:"2026-10-27T13:00:00Z", c:"USD", n:"Índice de precios de vivienda S&P/Case-Shiller (ago) interanual", i:1, k:"data", t:"Vivienda", p:"2,5%", hib:true, src:"tec"},
+  {d:"2026-10-27T14:00:00Z", c:"USD", n:"Confianza del consumidor del Conference Board (oct)", i:3, k:"data", t:"Consumo", hib:true, src:"tec"},
+  {d:"2026-10-27T14:00:00Z", c:"USD", n:"Índice manufacturero de la Fed de Richmond (oct)", i:1, k:"data", t:"Actividad", p:"-2", hib:true, src:"tec"},
+  {d:"2026-10-27T14:00:00Z", c:"USD", n:"Ventas de vivienda nueva (sep)", i:2, k:"data", t:"Vivienda", p:"0,684M", hib:true, src:"tec"},
+  {d:"2026-10-28T00:30:00Z", c:"AUD", n:"IPC de Australia (3T) interanual", i:3, k:"data", t:"Inflación", f:"3,9% (modelo TE)", p:"3,9% (2T)", hib:false, src:"tec"},
+  {d:"2026-10-28T00:30:00Z", c:"AUD", n:"IPC recortado medio del RBA (3T) trimestral", i:3, k:"data", t:"Inflación", f:"+0,9% (modelo TE)", p:"+0,8%", hib:false,
+   note:"La medida de inflación preferida del RBA y el dato más relevante para su próxima decisión (principios de noviembre).", src:"tec"},
+  {d:"2026-10-28T12:30:00Z", c:"USD", n:"Inventarios mayoristas (sep, preliminar)", i:1, k:"data", t:"Actividad", src:"scot"},
+  {d:"2026-10-28T13:45:00Z", c:"CAD", n:"Informe de política monetaria del BoC (MPR)", i:3, k:"cb", t:"Bancos centrales",
+   note:"Proyecciones actualizadas de crecimiento e inflación, publicadas a la vez que la decisión.", src:"tec"},
+  {d:"2026-10-28T14:30:00Z", c:"CAD", n:"Rueda de prensa del BoC", i:2, k:"cb", t:"Bancos centrales", src:"tec"},
+  {d:"2026-10-28T13:45:00Z", c:"CAD", n:"Decisión de tipos del Banco de Canadá (BoC)", i:3, k:"cb", t:"Bancos centrales", hib:true,
+   f:"2,25% (sin cambios)", p:"2,25%", note:"El empleo canadiense se deterioró con fuerza (–68.300 en septiembre) mientras la inflación sigue por encima del objetivo por el conflicto en Oriente Medio: el BoC navega entre el crecimiento y los precios. El consenso espera mantener en el 2,25%; el mercado descuenta en torno a un 25% de subida y TD Securities ve un 27% en octubre frente al 88% en diciembre.", src:"nq"},
+  {d:"2026-10-28T18:00:00Z", c:"USD", n:"Decisión de tipos de la Reserva Federal (FOMC)", i:3, k:"cb", t:"Bancos centrales", hib:true,
+   f:"4,00% (sin cambios)", p:"4,00%", note:"EL EVENTO DEL MES. En septiembre la Fed subió tipos +25 pb (la primera subida desde 2023) con el voto unánime, incluidos los no votantes. Tras los débiles datos de empleo y un IPC de septiembre caliente, la probabilidad implícita de subida en octubre cayó hasta ~20% desde el 70% previo. El consenso espera una pausa en el 4,00%. El blackout de la Fed va del 17 al 29 de octubre, así que no habrá discursos oficiales en la semana previa.", src:"nq"},
+  {d:"2026-10-28T18:30:00Z", c:"USD", n:"Rueda de prensa de la Fed (Warsh)", i:3, k:"cb", t:"Bancos centrales",
+   note:"Sin gráfico de puntos en esta reunión: el lenguaje del comunicado y la rueda de prensa son toda la señal. Primera reunión con Warsh en la silla tras el blackout.", src:"tec"},
+  {d:"2026-10-29T13:15:00Z", c:"EUR", n:"Decisión de tipos del BCE", i:3, k:"cb", t:"Bancos centrales", f:"2,65% (sin cambios)", p:"2,65%",
+   note:"Consenso de mantener en el 2,65%. La encuesta de Reuters del 5-8 de octubre mostraba a 70 de 73 economistas esperando una pausa, pero 64 de 73 anticipan una subida de +25 pb en diciembre. Las actas de septiembre ya mostraron un sesgo hawkish sin compromiso para las próximas reuniones: el listón sigue dependiendo de los datos.", src:"nq"},
+  {d:"2026-10-29T13:45:00Z", c:"EUR", n:"Rueda de prensa de Christine Lagarde (BCE)", i:3, k:"cb", t:"Bancos centrales",
+   note:"La rueda de prensa posterior a la decisión suele mover más que el comunicado, sobre todo si le preguntan por diciembre.", src:"nq"},
+  {d:"2026-10-29T12:30:00Z", c:"USD", n:"PIB de EE. UU. (3T) trimestral anualizado, primera estimación", i:3, k:"data", t:"Actividad", f:"+3,1% (modelo TE)", p:"+2,2% (2T)", hib:true, src:"tec"},
+  {d:"2026-10-29T12:30:00Z", c:"USD", n:"Deflactor del PCE subyacente (sep) mensual", i:3, k:"data", t:"Inflación", f:"+0,2%", p:"+0,2%", hib:false,
+   note:"La medida de inflación preferida de la Fed, publicada junto al PIB del tercer trimestre: el último gran insumo para la reunión de diciembre.", src:"tec"},
+  {d:"2026-10-29T12:30:00Z", c:"USD", n:"Deflactor del PCE subyacente (sep) interanual", i:3, k:"data", t:"Inflación", f:"3,3% (modelo TE)", p:"3,0%", hib:false, src:"tec"},
+  {d:"2026-10-29T12:30:00Z", c:"USD", n:"Renta personal y gasto de los consumidores (sep)", i:2, k:"data", t:"Consumo", hib:true, src:"tec"},
+  {d:"2026-10-29T23:30:00Z", c:"JPY", n:"Tasa de desempleo de Japón (sep)", i:1, k:"data", t:"Empleo", hib:false, src:"scot"},
+  {d:"2026-10-29T23:50:00Z", c:"JPY", n:"Producción industrial de Japón (sep, preliminar)", i:1, k:"data", t:"Actividad", hib:true, src:"scot"},
+  {d:"2026-10-30T03:00:00Z", c:"JPY", n:"Decisión de tipos del Banco de Japón (BoJ)", i:3, k:"cb", t:"Bancos centrales", f:"1,25% (sin cambios)", p:"1,25%", hib:true,
+   note:"Consenso de mantener en el 1,25%. El mercado de swaps descuenta menos del 20% de subida en octubre y en torno al 90% para diciembre. La propia reunión se ha anunciado como «sin decidir» respecto a las proyecciones.", src:"nq"},
+  {d:"2026-10-30T03:00:00Z", c:"JPY", n:"Informe trimestral de perspectivas del BoJ (Outlook Report)", i:3, k:"cb", t:"Bancos centrales",
+   note:"Proyecciones de crecimiento e inflación del BoJ. Una revisión al alza sería la señal más asimétrica para el yen, con la intervención todavía sobre la mesa.", src:"boj"},
+  {d:"2026-10-30T05:00:00Z", c:"JPY", n:"IPC de Tokio (oct)", i:2, k:"data", t:"Inflación", hib:false, src:"tec"},
+  {d:"2026-10-30T07:00:00Z", c:"EUR", n:"PIB de Francia (3T) preliminar trimestral", i:2, k:"data", t:"Actividad", f:"+0,1% (modelo TE)", p:"0,0%", hib:true, src:"tec"},
+  {d:"2026-10-30T07:45:00Z", c:"EUR", n:"IPC de Francia (oct) preliminar interanual", i:2, k:"data", t:"Inflación", p:"3,2%", hib:false, src:"tec"},
+  {d:"2026-10-30T08:00:00Z", c:"EUR", n:"PIB de España (3T) preliminar trimestral", i:2, k:"data", t:"Actividad", f:"+0,6% (modelo TE)", p:"+0,7%", hib:true, src:"tec"},
+  {d:"2026-10-30T08:00:00Z", c:"EUR", n:"IPC armonizado de España (oct) preliminar interanual", i:2, k:"data", t:"Inflación", f:"5,0% (modelo TE)", p:"4,9%", hib:false, src:"tec"},
+  {d:"2026-10-30T08:55:00Z", c:"EUR", n:"Tasa de desempleo de Alemania (oct)", i:2, k:"data", t:"Empleo", f:"6,4% (modelo TE)", p:"6,4%", hib:false, src:"tec"},
+  {d:"2026-10-30T09:00:00Z", c:"EUR", n:"PIB de Alemania (3T) preliminar trimestral", i:3, k:"data", t:"Actividad", f:"+0,2% (modelo TE)", p:"+0,3%", hib:true, src:"tec"},
+  {d:"2026-10-30T10:00:00Z", c:"EUR", n:"PIB de la eurozona (3T) preliminar trimestral", i:3, k:"data", t:"Actividad", f:"+0,1% (modelo TE)", p:"+0,6% (2T)", hib:true, src:"tec"},
+  {d:"2026-10-30T10:00:00Z", c:"EUR", n:"PIB de la eurozona (3T) preliminar interanual", i:2, k:"data", t:"Actividad", f:"+1,0% (modelo TE)", p:"+1,2% (2T)", hib:true, src:"tec"},
+  {d:"2026-10-30T13:00:00Z", c:"EUR", n:"IPC de Alemania (oct) preliminar interanual", i:3, k:"data", t:"Inflación", f:"3,4% (modelo TE)", p:"3,3%", hib:false, src:"tec"},
+  {d:"2026-10-30T10:00:00Z", c:"EUR", n:"Tasa de desempleo de la eurozona (sep)", i:2, k:"data", t:"Empleo", f:"6,4% (modelo TE)", p:"6,4%", hib:false, src:"tec"},
+  {d:"2026-10-30T13:30:00Z", c:"USD", n:"Índice de coste del empleo de EE. UU. (3T) trimestral", i:3, k:"data", t:"Empleo", f:"+0,6% (modelo TE)", p:"+0,9%", hib:false, src:"tec"},
+  {d:"2026-10-30T12:30:00Z", c:"CAD", n:"PIB de Canadá (ago) mensual", i:2, k:"data", t:"Actividad", f:"0,2% (modelo TE)", p:"0,2%", hib:true, src:"tec"},
+  {d:"2026-10-30T13:45:00Z", c:"USD", n:"PMI de Chicago (oct)", i:2, k:"data", t:"Actividad", p:"58,8", hib:true, src:"tec"}
+];
+
+/* ==========================================================================
+   2. UTILIDADES
+   ========================================================================== */
+const CUR = {
+  USD:{f:"🇺🇸",n:"Dólar estadounidense"}, EUR:{f:"🇪🇺",n:"Euro"}, GBP:{f:"🇬🇧",n:"Libra esterlina"},
+  JPY:{f:"🇯🇵",n:"Yen japonés"}, AUD:{f:"🇦🇺",n:"Dólar australiano"}, CAD:{f:"🇨🇦",n:"Dólar canadiense"},
+  CNY:{f:"🇨🇳",n:"Yuan chino"}, CHF:{f:"🇨🇭",n:"Franco suizo"}, NZD:{f:"🇳🇿",n:"Dólar neozelandés"},
+  OPEP:{f:"🛢️",n:"OPEP / energía"}, MXN:{f:"🇲🇽",n:"Peso mexicano"}, BRL:{f:"🇧🇷",n:"Real brasileño"}
+};
+const KIND = {
+  data:{l:"Dato macro",cls:""}, cb:{l:"Banco central",cls:"cb"}, speech:{l:"Discurso",cls:"sp"},
+  holiday:{l:"Festivo",cls:"hol"}, earnings:{l:"Empresas",cls:"corp"}, report:{l:"Informe",cls:""}
+};
+const TZ = [
+  {v:"auto",            l:"🕒 Zona local del equipo"},
+  {v:"UTC",             l:"UTC · GMT"},
+  {v:"Europe/Madrid",   l:"Madrid · CET/CEST"},
+  {v:"Europe/London",   l:"Londres · GMT/BST"},
+  {v:"Europe/Zurich",   l:"Zúrich"},
+  {v:"Europe/Moscow",   l:"Moscú"},
+  {v:"America/New_York",l:"Nueva York · ET"},
+  {v:"America/Chicago", l:"Chicago · CT"},
+  {v:"America/Sao_Paulo",l:"São Paulo · BRT"},
+  {v:"America/Mexico_City",l:"Ciudad de México"},
+  {v:"America/Argentina/Buenos_Aires",l:"Buenos Aires"},
+  {v:"Asia/Tokyo",      l:"Tokio · JST"},
+  {v:"Asia/Shanghai",   l:"Shanghái · CST"},
+  {v:"Asia/Hong_Kong",  l:"Hong Kong · HKT"},
+  {v:"Asia/Dubai",      l:"Dubái"},
+  {v:"Australia/Sydney",l:"Sídney · AEST"}
+];
+
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem("cal_"+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("cal_"+k, JSON.stringify(v)); }catch(e){} }
+};
+
+let state = {
+  range: LS.get("range","week"),
+  imps: LS.get("imps",[1,2,3]),
+  curs: LS.get("curs",null),
+  q: "",
+  onlyUpcoming: LS.get("onlyUpcoming",true),
+  groupDays: LS.get("groupDays",true),
+  tz: LS.get("tz","auto"),
+  theme: LS.get("theme","dark"),
+  showMap: true,
+  rxBase: LS.get("rxBase",1),
+  fuente: LS.get("fuente","auto"),
+  day: null,           // día seleccionado en el mini calendario (YYYY-MM-DD)
+  month: null          // mes mostrado en el mini calendario (YYYY-MM)
+};
+
+const EXTRA = () => LS.get("extra",[]).map(e=>({...e, own:true}));
+
+const evKey = e => e.d + "|" + e.n;
+function allEvents(){
+  const A = LS.get("actuals",{});
+  return baseEvents().concat(EXTRA())
+    .map((e,idx)=>{
+      const o = {...e, _id: idx, _ts: new Date(e.d).getTime()};
+      const k = evKey(e);
+      if(A[k] !== undefined && A[k] !== "") o.a = A[k];   // dato real introducido por el usuario
+      return o;
+    })
+    .sort((a,b)=> a._ts - b._ts);
+}
+function activeTZ(){ return state.tz==="auto" ? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC") : state.tz; }
+
+const _fmtCache = {};
+function fmt(date, opts, tz){
+  const zone = tz || activeTZ();
+  const key = zone + JSON.stringify(opts);
+  if(!_fmtCache[key]) _fmtCache[key] = new Intl.DateTimeFormat("es-ES", {...opts, timeZone:zone});
+  return _fmtCache[key].format(date);
+}
+const dk = (date) => fmt(date,{year:"numeric",month:"2-digit",day:"2-digit"}).split("/").reverse().join("-");
+const hm = (date) => fmt(date,{hour:"2-digit",minute:"2-digit",hour12:false});
+const longDay = (date) => fmt(date,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+const tzAbbr = (date) => {
+  try{
+    const p = new Intl.DateTimeFormat("en-US",{timeZoneName:"short",timeZone:activeTZ()}).formatToParts(date);
+    return (p.find(x=>x.type==="timeZoneName")||{}).value || activeTZ();
+  }catch(e){ return activeTZ(); }
+};
+
+/* --- parseo de valores publicados para calcular la sorpresa --- */
+function parseNum(s){
+  if(s===undefined||s===null) return null;
+  let str = String(s).trim();
+  if(!str || /^n\/?[ad]$/i.test(str) || str==="—") return null;
+  const m = str.replace(/\s/g,"").match(/(-?\d+(?:[.,]\d+)?)\s*([KMB])?/i);
+  if(!m) return null;
+  let v = parseFloat(m[1].replace(",","."));
+  if(isNaN(v)) return null;
+  const mult = {K:1e3, M:1e6, B:1e9}[(m[2]||"").toUpperCase()] || 1;
+  return v*mult;
+}
+function unitOf(s){
+  if(s===undefined||s===null) return "";
+  const str = String(s);
+  if(str.includes("%")) return "pp";
+  const m = str.replace(/\s/g,"").match(/[KMB]/i);
+  return m ? m[0].toUpperCase() : "";
+}
+function surprise(e){
+  const a = parseNum(e.a), f = parseNum(e.f);
+  if(a===null || f===null) return null;
+  const diff = a - f;
+  const u = unitOf(e.a) || unitOf(e.f);
+  let txt = Math.abs(diff) >= 1000 ? (diff/1000).toFixed(1).replace(".",",")+"K" :
+            (Math.abs(diff) < 10 ? diff.toFixed(2) : diff.toFixed(1)).replace(".",",");
+  if(u==="pp") txt = (diff>=0?"+":"") + diff.toFixed(1).replace(".",",") + " pp";
+  else if(u) txt = (diff>=0?"+":"") + txt + u;
+  else txt = (diff>=0?"+":"") + txt;
+  const better = e.hib ? diff > 0 : diff < 0;
+  const kind = Math.abs(diff) < 1e-9 ? "eq" : (better ? "up" : "dn");
+  return {diff, txt, kind, a, f};
+}
+
+
+/* ==========================================================================
+   2.b  MOTOR DE REACCIÓN POR ACTIVO
+   Traduce cada evento en una dirección esperada por activo, en dos escenarios
+   (dato por encima / por debajo de lo previsto). Modelo direccional heurístico.
+   ========================================================================== */
+const ASSETS = [
+  {k:"DXY",    s:"DÓLAR", l:"USD · Índice dólar (DXY)", n:"Índice del dólar",              g:"Divisa",   core:true},
+  {k:"EURUSD", s:"EUR",   l:"EUR · 6E (EUR/USD)",        n:"Futuro del euro (EUR/USD)",     g:"Divisa",   core:true},
+  {k:"GBPUSD", s:"GBP",   l:"GBP · 6B (GBP/USD)",        n:"Futuro de la libra (GBP/USD)",  g:"Divisa",   core:true},
+  {k:"NQ",     s:"NQ",    l:"NQ · Nasdaq 100",           n:"Futuro del Nasdaq 100",         g:"Bolsa",    core:true},
+  {k:"ES",     s:"ES",    l:"ES · S&P 500",              n:"Futuro del S&P 500",            g:"Bolsa",    core:true},
+  {k:"GC",     s:"ORO",   l:"GC · Oro",                  n:"Futuro del oro",                g:"Materias", core:true},
+  {k:"CL",     s:"WTI",   l:"CL · Petróleo WTI",         n:"Futuro del petróleo WTI",       g:"Materias", core:true},
+  {k:"USDJPY", s:"JPY",   l:"USDJPY",                    n:"Dólar / Yen",                   g:"Divisa"},
+  {k:"FDAX",   s:"DAX",   l:"FDAX · DAX 40",             n:"Futuro del DAX",                g:"Bolsa"},
+  {k:"ZN",     s:"ZN",    l:"ZN · T-Note 10 años",       n:"Futuro del bono a 10 años (precio)", g:"Bonos"},
+  {k:"BTC",    s:"BTC",   l:"BTC · Bitcoin",             n:"Bitcoin",                       g:"Cripto",   note:"correlación variable"}
+];
+
+/* Coeficientes por perfil. fx = divisa del dato · eq = bolsas · gold = oro ·
+   oil = petróleo · bond = precio de los bonos. Todos se multiplican por el
+   escenario (+1 = "al alza" tal y como se etiqueta en cada perfil). */
+const PROFILE = {
+  infl:    {l:"Inflación", su:"IPC ALTO", sd:"IPC BAJO",   up:"Dato al alza",   dn:"Dato a la baja",   fx:+1.0, eq:-1.2, gold:-1.0, oil: 0.0, bond:-1.0,
+            why:"Una inflación por encima de lo previsto endurece las expectativas de tipos: sube la divisa y los rendimientos, y caen la renta variable y el oro por el canal de los tipos reales."},
+  crec:    {l:"Actividad", su:"DATO ALTO", sd:"DATO BAJO",   up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.8, eq:+1.0, gold:-0.6, oil:+0.3, bond:-0.8,
+            why:"Un dato de actividad mejor de lo previsto mejora el crecimiento esperado: positivo para bolsas y divisa, con presión al alza en los rendimientos (precios de bonos a la baja)."},
+  empleo:  {l:"Empleo", su:"EMPLEO FUERTE", sd:"EMPLEO DÉBIL",      up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.9, eq:+0.3, gold:-0.7, oil:+0.2, bond:-0.9,
+            why:"Un empleo más fuerte de lo previsto apoya a la divisa y a los rendimientos, pero la renta variable lo interpreta de forma mixta: más crecimiento contra más riesgo de que el banco central apriete."},
+  desempleo:{l:"Desempleo", su:"PARO ALTO", sd:"PARO BAJO",  up:"Paro al alza",   dn:"Paro a la baja",   fx:-0.9, eq:-0.8, gold:+0.4, oil:-0.2, bond:+0.8,
+            why:"Más paro o más solicitudes de subsidio de lo previsto debilita la divisa y las expectativas de tipos: suele favorecer al oro y al precio de los bonos."},
+  consumo: {l:"Consumo", su:"CONSUMO ALTO", sd:"CONSUMO BAJO",     up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.7, eq:+0.9, gold:-0.5, oil:+0.2, bond:-0.7,
+            why:"Un consumo más fuerte de lo previsto sostiene a las bolsas y a la divisa, con los rendimientos al alza."},
+  vivienda:{l:"Vivienda", su:"DATO ALTO", sd:"DATO BAJO",    up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.6, eq:+0.7, gold:-0.4, oil: 0.0, bond:-0.6,
+            why:"La vivienda es un indicador adelantado muy sensible a los tipos: un dato fuerte apoya de forma moderada a la divisa y a las bolsas, y presiona los precios de los bonos."},
+  bc:      {l:"Banco central", su:"HAWKISH", sd:"DOVISH",up:"Tono más duro (hawkish)", dn:"Tono más blando (dovish)", fx:+1.4, eq:-1.2, gold:-1.0, oil:-0.2, bond:-1.2,
+            why:"Un banco central más duro de lo esperado estrecha el diferencial de tipos: la divisa sube con fuerza y caen renta variable, oro y precio de los bonos."},
+  energia: {l:"Energía", su:"INVENTARIOS +", sd:"INVENTARIOS −",     up:"Inventarios al alza", dn:"Inventarios a la baja", fx:0.0, eq:+0.3, gold:+0.2, oil:-1.5, bond:+0.2,
+            why:"Un aumento de inventarios de crudo presiona el precio del petróleo a la baja. El efecto sobre el resto de activos es indirecto, vía inflación y crecimiento."},
+  comercio:{l:"Comercio", su:"DATO ALTO", sd:"DATO BAJO",    up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.6, eq:+0.2, gold: 0.0, oil: 0.0, bond:-0.2,
+            why:"Un saldo comercial mejor de lo previsto sostiene a la divisa, con un efecto limitado sobre el resto de activos."},
+  fiscal:  {l:"Fiscal", su:"DATO ALTO", sd:"DATO BAJO",      up:"Dato al alza",   dn:"Dato a la baja",   fx:+0.3, eq:+0.2, gold:-0.2, oil: 0.0, bond:-0.4,
+            why:"Los datos fiscales afectan sobre todo al mercado de bonos y, de forma indirecta, a la divisa."},
+  empresas:{l:"Empresas", su:"MEJOR", sd:"PEOR",    up:"Mejor de lo previsto", dn:"Peor de lo previsto", fx:0.0, eq:+1.0, gold: 0.0, oil: 0.0, bond:+0.2,
+            why:"Los resultados empresariales mueven directamente al índice de referencia de esas compañías, con poco efecto sobre divisas y materias primas."},
+  informe: {l:"Informe",     up:"—", dn:"—", fx:0, eq:0, gold:0, oil:0, bond:0,
+            why:"Publicación informativa: no genera una reacción direccional mecánica, aunque su contenido puede cambiar el relato de mercado."},
+  festivo: {l:"Festivo",     up:"—", dn:"—", fx:0, eq:0, gold:0, oil:0, bond:0,
+            why:"Festivo: menos liquidez y movimientos más erráticos, sin impacto direccional propio. Ojo a las aperturas y a los huecos."}
+};
+
+/* Peso del evento sobre los activos estadounidenses según su divisa. */
+const REACH = {USD:1.00, EUR:0.55, CNY:0.55, GBP:0.40, JPY:0.40, CAD:0.35, AUD:0.35, OPEP:0.30, OTRA:0.30};
+
+function profileOf(e){
+  if(e.rx && PROFILE[e.rx]) return e.rx;
+  if(e.k==="holiday") return "festivo";
+  if(e.k==="report")  return "informe";
+  if(e.k==="earnings")return "empresas";
+  if(e.k==="cb"||e.k==="speech"||e.t==="Bancos centrales") return "bc";
+  const n=(e.n||"").toLowerCase(), t=e.t||"";
+  if(t==="Inflación") return "infl";
+  if(t==="Empleo")    return /desempleo|paro|solicitud|subsidio|claims/.test(n) ? "desempleo" : "empleo";
+  if(t==="Consumo")   return "consumo";
+  if(t==="Vivienda")  return "vivienda";
+  if(t==="Actividad") return "crec";
+  if(t==="Energía")   return "energia";
+  if(t==="Comercio")  return "comercio";
+  if(t==="Fiscal")    return "fiscal";
+  return "crec";
+}
+
+/* Devuelve la dirección esperada de cada activo ante una sorpresa.
+   scen = +1 → escenario "al alza" del perfil ; scen = -1 → el contrario. */
+function assetMap(e, scen){
+  const prof = profileOf(e), P = PROFILE[prof], C = e.c;
+  const reach = REACH[C] !== undefined ? REACH[C] : 0.30;
+  const clamp = v => Math.max(-2, Math.min(2, v));
+  const out = {};
+
+  const fx = P.fx * scen;                 // impulso sobre la divisa del dato
+  const strUSD = (C==="USD") ? fx : -0.45*fx;
+
+  out.EURUSD = clamp(((C==="EUR"?fx:0) - strUSD) * 1.25);
+  out.DXY    = clamp(strUSD * 1.25);
+  out.GBPUSD = clamp(((C==="GBP"?fx:0) - strUSD) * 1.15);
+  out.USDJPY = clamp((strUSD - (C==="JPY"?fx:0)) * 1.15);
+
+  const eq = P.eq * scen;
+  out.ES   = clamp(eq*reach - 0.30*strUSD);
+  out.NQ   = clamp((eq*reach - 0.38*strUSD) * 1.22);
+  out.FDAX = clamp(eq*(C==="EUR" ? 0.85 : reach*0.75) - 0.20*strUSD);
+  out.GC   = clamp(P.gold*scen*reach - 0.55*strUSD);
+  out.ZN   = clamp(P.bond*scen*(C==="USD" ? 1.0 : 0.35));
+  out.CL   = clamp(P.oil*scen + 0.25*eq*reach);
+  out.BTC  = clamp((eq*reach - 0.30*strUSD) * 0.85);
+
+  return out;
+}
+
+
+/* Nombre del banco central y del índice de referencia por divisa. */
+const CB  = {USD:"la Fed", EUR:"el BCE", GBP:"el Banco de Inglaterra", JPY:"el Banco de Japón",
+             CAD:"el Banco de Canadá", AUD:"el RBA", CNY:"el PBoC", CHF:"el SNB", NZD:"el RBNZ", OPEP:"—"};
+const IDX = {USD:"el S&P 500 y el Nasdaq", EUR:"el DAX y el Euro Stoxx", GBP:"el FTSE 100",
+             JPY:"el Nikkei", CAD:"el S&P/TSX", AUD:"el ASX 200", CNY:"el CSI 300", CHF:"el SMI", OPEP:"—"};
+
+/* Patrón intradía que sigue casi cualquier dato de alto impacto. */
+const PATTERN = "Patrón intradía habitual en un dato de alto impacto: en los primeros <b>1-5 minutos</b> hay un latigazo de los algoritmos con spreads muy abiertos y liquidez irregular (el precio del primer minuto casi nunca es la dirección del día). Entre el <b>minuto 5 y el 30</b> suele venir un retroceso parcial del 30-60% del primer impulso. A partir de ahí manda la tendencia real, ya con el dato digerido y los niveles reconstruidos. Por eso el mismo dato puede dar un movimiento y su contrario según en qué minuto entres.";
+
+/* Cadena de transmisión, paso a paso, según el perfil del evento. */
+function chainOf(e){
+  const prof = profileOf(e), cb = CB[e.c] || "el banco central", idx = IDX[e.c] || "su índice de referencia";
+  const soloUS = e.c !== "USD";
+  switch(prof){
+    case "infl": return [
+      ["Sorpresa","El dato sale por encima del consenso. No importa el nivel, importa la desviación: 3,7% frente a 3,6% ya es una sorpresa."],
+      ["Tipos","El mercado sube la probabilidad de que "+cb+" endurezca. Sube el rendimiento del bono a 2 años (expectativas) y arrastra al 10 años."],
+      ["Descuento","Al subir la tasa de descuento cae el valor presente de todos los beneficios futuros. <b>Cuanto más lejos estén en el tiempo, más cae el activo.</b> Ese es el efecto duración."],
+      ["Divisa","El diferencial de tipos esperado favorece a "+e.c+" y el índice del dólar se mueve en consecuencia."],
+      ["Resultado","Cae primero lo más caro y lo más largo: <b>NQ más que ES y ES más que el Dow</b>. El oro cae por el mayor coste de oportunidad de tener un activo que no rinde, y el precio de los bonos cae al subir los rendimientos."]
+    ];
+    case "bc": return [
+      ["Sorpresa","El banco central suena más duro de lo descontado: sube, o mantiene pero con un mensaje más restrictivo (o la rueda de prensa endurece el tono)."],
+      ["Tipos","Se reprecifica toda la senda: el tipo terminal esperado sube y el primer recorte se aleja."],
+      ["Descuento","Cae el valor presente de los flujos y se estrecha el diferencial de tipos con el resto del mundo."],
+      ["Divisa","La divisa sube con fuerza; el movimiento suele ser el más limpio y direccional de todos los eventos macro."],
+      ["Resultado","Renta variable y oro a la baja, con "+idx+" a la cabeza. Es el evento donde el efecto duración se ve más puro."]
+    ];
+    case "empleo": return [
+      ["Sorpresa","El empleo sale más fuerte de lo previsto."],
+      ["Doble lectura","Para el crecimiento es buena noticia; para los tipos es una razón más para que "+cb+" no afloje. Las dos fuerzas tiran en direcciones opuestas."],
+      ["Tipos","Suben los rendimientos y se fortalece la divisa."],
+      ["Resultado","La renta variable reacciona <b>de forma mixta</b>: si el mercado está en modo \"buenos datos son buenos\", sube; si está en modo \"buenos datos son malos porque traen más subidas de tipos\", cae. La divisa sube en ambos casos."]
+    ];
+    case "desempleo": return [
+      ["Sorpresa","El paro o las solicitudes de subsidio salen por encima de lo previsto: el mercado laboral se enfría."],
+      ["Tipos","Bajan las expectativas de tipos: "+cb+" tendrá menos motivos para endurecer y más para aflojar."],
+      ["Descuento","Bajan los rendimientos y sube el valor presente de los flujos: favorable para bonos y oro."],
+      ["Crecimiento","Pero también es peor crecimiento: la renta variable lo suele leer como mala noticia."],
+      ["Resultado","Divisa a la baja, oro y precio de los bonos al alza, renta variable a la baja. Es el patrón \"bad news is bad news\"."]
+    ];
+    case "energia": return [
+      ["Sorpresa","Los inventarios de crudo suben (o bajan) más de lo previsto."],
+      ["Oferta","Más inventario = más oferta disponible = presión a la baja en el precio del barril."],
+      ["Resultado","El movimiento se concentra en el WTI y sus derivados (gasolina, calefacción). El efecto sobre bolsas, oro y divisas es indirecto y llega por la vía de la inflación y del crecimiento."]
+    ];
+    case "empresas": return [
+      ["Sorpresa","Los resultados baten o fallan frente a lo esperado."],
+      ["Beneficios","Cambia directamente el numerador de la valoración: el beneficio esperado de esas compañías."],
+      ["Resultado","El efecto es específico del índice y del sector de esas empresas. Poco contagio a divisas y materias primas, salvo que la sorpresa sea enorme o venga del sector tecnológico."]
+    ];
+    default: return [
+      ["Sorpresa","El dato de "+(PROFILE[prof].l||"").toLowerCase()+" sale por encima o por debajo de lo previsto."],
+      ["Crecimiento","Cambian las expectativas de actividad, y con ellas los beneficios esperados de las empresas."],
+      ["Tipos","También cambian las expectativas de tipos: "+cb+" reacciona a los datos."],
+      ["Resultado","Bolsa y divisa en la dirección del dato; el oro y los bonos suelen hacerlo en la contraria porque recogen el movimiento de los rendimientos."]
+    ];
+  }
+}
+
+function arrowOf(v){
+  if(v >= 1.2) return {s:"▲▲", lv:"lv2",  t:"alza fuerte"};
+  if(v >= 0.45) return {s:"▲",  lv:"lv1",  t:"alza"};
+  if(v > 0.12) return {s:"△",  lv:"lv05", t:"alza leve"};
+  if(v <= -1.2) return {s:"▼▼", lv:"lvn2", t:"baja fuerte"};
+  if(v <= -0.45) return {s:"▼",  lv:"lvn1", t:"baja"};
+  if(v < -0.12) return {s:"▽",  lv:"lvn05",t:"baja leve"};
+  return {s:"=", lv:"lv0", t:"sin efecto claro"};
+}
+
+function rxChip(assetKey, v){
+  const a = ASSETS.find(x=>x.k===assetKey) || {l:assetKey};
+  const ar = arrowOf(v);
+  return `<span class="rxchip ${ar.lv}" title="${esc(a.n)}: ${esc(ar.t)}"><b>${esc(a.s||a.l)}</b><i>${ar.s}</i></span>`;
+}
+
+/* Impulso a partir del DATO REAL: +1 = el número salió por encima de lo previsto.
+   Devuelve null si todavía no hay dato numérico publicado. */
+function impulseOf(e){
+  const a = parseNum(e.a), f = parseNum(e.f);
+  if(a===null || f===null) return null;
+  const dev = a - f;
+  if(Math.abs(dev) < 1e-9) return 0;
+  return dev > 0 ? 1 : -1;
+}
+/* Impulso implícito en la PREVISIÓN: compara consenso con el dato previo.
+   +1 = el consenso espera que el número suba. null si faltan datos. */
+function forecastBias(e){
+  const f = parseNum(e.f), p = parseNum(e.p);
+  if(f===null || p===null) return null;
+  const dev = f - p;
+  if(Math.abs(dev) < 1e-9) return 0;
+  return dev > 0 ? 1 : -1;
+}
+
+/* Palabra que describe la dirección de un activo. */
+/* v = intensidad esperada (-2 a +2) → verbo + fuerza */
+function wordOf(v){
+  const up = v > 0;
+  const abs = Math.abs(v);
+  if(abs <= 0.12) return {w:"NEUTRO", c:"eq", f:"n"};
+  const fuerza = abs >= 1.2 ? "f" : abs >= 0.45 ? "" : "s";
+  const verbo = up ? "SUBE" : "BAJA";
+  const txt = fuerza === "f" ? verbo+" FUERTE" : fuerza === "s" ? verbo+" DESPACIO" : verbo;
+  return {w:txt, c: up ? (fuerza==="s"?"up soft":"up") : (fuerza==="s"?"dn soft":"dn"), f:fuerza};
+}
+function rxChip(assetKey, v){
+  const a = ASSETS.find(x=>x.k===assetKey) || {s:assetKey, l:assetKey, n:assetKey};
+  const d = wordOf(v);
+  return `<span class="rxw ${d.c}" title="${esc(a.n)}: ${esc(d.w)}">${esc(a.s||a.l)} <b>${d.w}</b></span>`;
+}
+
+/* Línea de dirección: con el dato real si ya salió, si no con la previsión. */
+function rxStrip(e){
+  const prof = profileOf(e);
+  if(prof==="festivo" || prof==="informe") return "";
+  const core = ASSETS.filter(a=>a.core);
+  const imp = impulseOf(e);
+
+  if(imp !== null){
+    if(imp === 0)
+      return `<div class="rxdir live"><span class="tag">⚡ Ya salió · salió EN LÍNEA con lo previsto · reacción mínima, sin dirección clara</span></div>`;
+    const m = assetMap(e, imp);
+    const etq = imp > 0 ? "Ya salió · salió POR ENCIMA de lo previsto" : "Ya salió · salió POR DEBAJO de lo previsto";
+    return `<div class="rxdir live">
+      <span class="tag">⚡ ${esc(etq)}</span>
+      ${core.map(a=>rxChip(a.k, m[a.k])).join("")}
+    </div>`;
+  }
+
+  const b = forecastBias(e);
+  if(b === null) return "";   // sin previsión ni dato: no hay nada que calcular
+  const m = assetMap(e, b);
+  if(b === 0 && prof === "bc" && (e.k === "cb" || e.k === "speech"))
+    return `<div class="rxdir pend"><span class="tag">🔮 Decisión ampliamente descontada · el precio se moverá por el TONO (hawkish o dovish), no por el tipo. Ver el detalle para los dos escenarios</span></div>`;
+  const etq = b === 0 ? "Según la previsión · sin sesgo (se espera igual que el dato previo)"
+                      : (b > 0 ? "Según la previsión · el consenso espera el dato AL ALZA"
+                               : "Según la previsión · el consenso espera el dato A LA BAJA");
+  return `<div class="rxdir pend">
+    <span class="tag">🔮 ${esc(etq)} · puede hacer</span>
+    ${core.map(a=>rxChip(a.k, m[a.k])).join("")}
+  </div>`;
+}
+
+function rxDetail(e){
+  const prof = profileOf(e), P = PROFILE[prof];
+  if(prof==="festivo" || prof==="informe")
+    return `<div class="full"><div class="k">Mapa de reacción por activo</div><div class="note">${esc(P.why)}</div></div>`;
+  const up = assetMap(e, +1), dn = assetMap(e, -1);
+  const cls = v => v>0.12 ? "pos" : v<-0.12 ? "neg" : "zero";
+  const fila = a => {
+    const u = arrowOf(up[a.k]), d = arrowOf(dn[a.k]);
+    return `<tr><td class="a">${esc(a.l)}${a.note?` <span class="rxint">(${esc(a.note)})</span>`:""}</td>
+      <td class="c ${cls(up[a.k])}">${u.s}</td><td class="c ${cls(dn[a.k])}">${d.s}</td>
+      <td class="note">${d.w} / ${wordOf(dn[a.k]).w}</td></tr>`;
+  };
+  const rows = ASSETS.filter(a=>a.core).map(fila).join("")
+    + `<tr class="sep"><td colspan="4">Otros activos de referencia</td></tr>`
+    + ASSETS.filter(a=>!a.core).map(fila).join("");
+  return `<div class="full">
+    <div class="rxhead">
+      <span class="rxbadge">⚡ Qué hará el precio · ${esc(P.l)}</span>
+      <span style="font-size:12px;color:var(--muted)">Si el dato sale <b>${esc(P.up.toLowerCase())}</b> o <b>${esc(P.dn.toLowerCase())}</b>, esto es lo que hace cada activo</span>
+    </div>
+    <table class="rxtable">
+      <tr><th>Activo</th><th class="hl">${esc(P.up)}</th><th class="hl">${esc(P.dn)}</th><th>Lectura</th></tr>
+      ${rows}
+    </table>
+    <div class="note" style="margin-top:8px">${esc(P.why)}</div>
+    <div style="margin-top:10px">
+      <div class="k" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:700;margin-bottom:4px">Cómo actúa el precio, paso a paso</div>
+      <ol class="rxchain">${chainOf(e).map(([t,d])=>`<li><span class="rxstep">${esc(t)}</span>${d}</li>`).join("")}</ol>
+    </div>
+    <div class="rxpat">⏱️ ${PATTERN}</div>
+    ${e.mkt?`<div class="rxmkt"><b style="color:var(--good)">✅ QUÉ HIZO EL PRECIO REALMENTE</b><br>${e.mkt}${e.mktSrc?` <span style="display:block;margin-top:6px;font-size:11.5px">Fuente: ${e.mktSrc.map(k=>SRC[k]?`<a href="${SRC[k].u}" target="_blank" rel="noopener">${esc(SRC[k].t)}</a>`:"").join(" · ")}</span>`:""}</div>`:""}
+    <div style="font-size:11px;color:var(--muted2);margin-top:6px">
+      Modelo direccional heurístico y simétrico. La reacción real depende de lo ya descontado en el precio,
+      del posicionamiento y del régimen de mercado: no es una predicción ni una señal de entrada.
+    </div>
+  </div>`;
+}
+
+/* ==========================================================================
+   2.c  DATOS EN VIVO
+   Un flujo de trabajo de GitHub descarga cada pocas horas el calendario
+   público y lo deja como `datos.json` en tu propio sitio. Al ser del mismo
+   dominio no hay problema de CORS. Si no existe, se usa el calendario curado.
+   ========================================================================== */
+let LIVE = LS.get("vivo", null);           // { actualizado, origen, eventos:[...] }
+let ultimoFetch = 0;                       // para no repetir descargas
+let detalleAbierto = null;                 // fila expandida, para no perderla al refrescar
+const INTERVALO_REFRESCO = 180000;          // 3 minutos
+
+function clasificar(title){
+  const t = (title || "").toLowerCase();
+  if(/crude oil inventories|natural gas storage|opec|oil|gasoline/.test(t))            return "Energía";
+  if(/rate decision|interest rate|fomc|monetary policy|press conference|speaks|speech|minutes|testimony|symposium/.test(t)) return "Bancos centrales";
+  if(/unemployment rate|jobless|claims|payroll|employment change|non-farm|nonfarm|adp/.test(t)) return "Empleo";
+  if(/cpi|inflation|ppi|producer price|pce|price index|wage|earnings/.test(t))          return "Inflación";
+  if(/retail sales|consumer confidence|consumer sentiment|personal spending|michigan/.test(t)) return "Consumo";
+  if(/housing|home sales|building permits|construction|mortgage/.test(t))               return "Vivienda";
+  if(/trade balance|current account|exports|imports|balance of trade/.test(t))          return "Comercio";
+  if(/budget|deficit|debt|treasury|fiscal|auction/.test(t))                             return "Fiscal";
+  return "Actividad";
+}
+function mapFF(x){
+  let iso = x.date || "";
+  let allDay = false;
+  if(/T00:00:00/.test(iso)){ iso = iso.slice(0,10) + "T12:00:00Z"; allDay = true; }
+  const imp = String(x.impact || "").toLowerCase();
+  const cb  = /rate decision|speaks|speech|minutes|monetary policy|press conference|testimony/i.test(x.title || "");
+  return {
+    d: iso,
+    c: String(x.country || "USD").toUpperCase(),
+    n: x.title || "(sin título)",
+    i: imp.indexOf("high") === 0 ? 3 : imp.indexOf("med") === 0 ? 2 : 1,
+    k: imp.indexOf("holiday") === 0 ? "holiday" : (cb ? "cb" : "data"),
+    t: clasificar(x.title),
+    a: x.actual || "", f: x.forecast || "", p: x.previous || "",
+    allDay: allDay, live: true
+  };
+}
+async function cargarVivo(silencioso, suave){
+  const chip = document.getElementById("livechip");
+  if(chip && !silencioso){ chip.className = "srclive"; chip.innerHTML = '<span class="dot"></span> descargando…'; }
+  const antes = (LIVE && LIVE.eventos) ? JSON.stringify(LIVE.eventos) : "";
+  try{
+    const r = await fetch("datos.json?_=" + Date.now(), { cache: "no-store" });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    const arr = Array.isArray(d) ? d : (d.eventos || []);
+    if(!arr.length) throw new Error("sin eventos");
+    LIVE = {
+      actualizado: d.actualizado || r.headers.get("last-modified") || new Date().toISOString(),
+      origen: d.origen || "feed público",
+      eventos: arr.map(mapFF).filter(e=>e.d && e.c)
+    };
+    LS.set("vivo", LIVE);
+    ultimoFetch = Date.now();
+    pintarChip(true);
+    const cambio = JSON.stringify(LIVE.eventos) !== antes;
+    if(state.fuente !== "curado" && (cambio || !antes)){
+      if(suave) renderSuave(); else render();
+      renderMini();
+    }
+    return true;
+  }catch(err){
+    ultimoFetch = Date.now();
+    if(!LIVE) LIVE = null;
+    pintarChip(false, err.message);
+    if(state.fuente === "vivo" && !LIVE) render();
+    return false;
+  }
+}
+/* Repinta sin que el usuario pierda el sitio donde estaba leyendo. */
+function renderSuave(){
+  const y = window.scrollY;
+  render();
+  if(Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
+}
+/* Refresco silencioso: sólo mientras la pestaña está a la vista. */
+function autoRefresco(){
+  if(document.visibilityState !== "visible") return;
+  if(state.fuente === "curado") return;
+  if(Date.now() - ultimoFetch < 60000) return;
+  cargarVivo(true, true);
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible") autoRefresco();
+});
+
+function pintarChip(ok, err){
+  const chip = document.getElementById("livechip");
+  if(!chip) return;
+  if(ok && LIVE){
+    const hace = Math.round((Date.now() - new Date(LIVE.actualizado).getTime()) / 60000);
+    const txt = hace < 2 ? "ahora mismo" : hace < 90 ? "hace " + hace + " min" :
+                hace < 2880 ? "hace " + Math.round(hace/60) + " h" : "hace " + Math.round(hace/1440) + " d";
+    chip.className = "srclive on";
+    chip.innerHTML = '<span class="dot"></span> EN VIVO · ' + LIVE.eventos.length + ' eventos · ' + txt;
+    chip.title = "Fuente: " + (LIVE.origen || "feed público") + " · actualizado " + new Date(LIVE.actualizado).toLocaleString("es-ES");
+  }else{
+    chip.className = "srclive err";
+    chip.innerHTML = '<span class="dot"></span> sin datos en vivo' + (err ? " (" + err + ")" : "");
+    chip.title = "No se ha podido descargar datos.json. Se muestra el calendario curado.";
+  }
+}
+function baseEvents(){
+  const hayVivo = !!(LIVE && LIVE.eventos && LIVE.eventos.length);
+  if(state.fuente === "vivo")   return hayVivo ? LIVE.eventos : [];
+  if(state.fuente === "curado") return EVENTS;
+  return hayVivo ? LIVE.eventos : EVENTS;
+}
+
+/* ==========================================================================
+   3. FILTRADO
+   ========================================================================== */
+/* Desfase (ms) de una zona horaria respecto a UTC en un instante dado. */
+function tzOffsetMs(date, tz){
+  const p = new Intl.DateTimeFormat("en-US",{timeZone:tz, hour12:false,
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+    .formatToParts(date).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  const asUTC = Date.UTC(+p.year, +p.month-1, +p.day, (+p.hour)%24, +p.minute, +p.second);
+  return asUTC - date.getTime();
+}
+/* Instante UTC de las 00:00 de un día del calendario en la zona activa. */
+function startOfDayKey(key){
+  const [y,m,d] = key.split("-").map(Number);
+  const guess = Date.UTC(y, m-1, d, 0, 0, 0);
+  return guess - tzOffsetMs(new Date(guess), activeTZ());
+}
+const dayKeyOffset = (n) => dk(new Date(Date.now() + n*86400000));
+function dowOfKey(key){
+  const [y,m,d] = key.split("-").map(Number);
+  return (new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7; // 0 = lunes
+}
+
+function rangeBounds(){
+  if(state.day) return {a:null, b:null, day:state.day};
+  const start = (n)=> startOfDayKey(dayKeyOffset(n));
+  switch(state.range){
+    case "today":    return {a:start(0), b:start(1)};
+    case "tomorrow": return {a:start(1), b:start(2)};
+    case "week": {
+      const dow = dowOfKey(dayKeyOffset(0));
+      return {a:start(-dow), b:start(-dow+7)};
+    }
+    case "nextweek": {
+      const dow = dowOfKey(dayKeyOffset(0));
+      return {a:start(-dow+7), b:start(-dow+14)};
+    }
+    case "month": {
+      const k = dayKeyOffset(0).split("-").map(Number);
+      const from = `${k[0]}-${String(k[1]).padStart(2,"0")}-01`;
+      const to = k[1]===12 ? `${k[0]+1}-01-01` : `${k[0]}-${String(k[1]+1).padStart(2,"0")}-01`;
+      return {a: startOfDayKey(from), b: startOfDayKey(to)};
+    }
+    default: return {a:null, b:null};
+  }
+}
+
+function filtered(){
+  const b = rangeBounds();
+  const q = state.q.trim().toLowerCase();
+  const now = Date.now();
+  return allEvents().filter(e=>{
+    if(!state.imps.includes(e.i)) return false;
+    if(state.curs && !state.curs.includes(e.c)) return false;
+    if(b.day && dk(new Date(e._ts)) !== b.day) return false;
+    if(b.a!==null && (e._ts < b.a || e._ts >= b.b)) return false;
+    if(state.onlyUpcoming && e._ts + (e.allDay ? 86400000 : 0) < now - 5*60000) return false;
+    if(q){
+      const hay = (e.n+" "+(CUR[e.c]?CUR[e.c].n:"")+" "+e.c+" "+(e.t||"")+" "+(e.note||"")).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+/* ==========================================================================
+   4. RENDER
+   ========================================================================== */
+const $ = s=>document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function impHTML(i){ return `<span class="imp" data-i="${i}"><i class="${i>=1?"f":""}"></i><i class="${i>=2?"f":""}"></i><i class="${i>=3?"f":""}"></i></span>`; }
+function curHTML(c){ const k=CUR[c]||{f:"🏳️"}; return `<span class="flag">${k.f}</span><span class="curcode">${esc(c)}</span>`; }
+
+function relativeLabel(ts){
+  const diff = ts - Date.now();
+  const abs = Math.abs(diff);
+  const mins = Math.round(abs/60000), hrs = Math.floor(abs/3600000), days = Math.floor(abs/86400000);
+  let s;
+  if(abs < 90000) s = "ahora";
+  else if(mins < 60) s = mins+" min";
+  else if(hrs < 24) s = hrs+" h "+(mins%60)+" min";
+  else s = days+" d";
+  return diff >= 0 ? "en "+s : "hace "+s;
+}
+
+function leftText(ts){
+  const d = ts - Date.now();
+  if(d < -3600000) return "publicado";
+  if(d < 60000) return "ahora";
+  return relativeLabel(ts).replace(/^en /,"");
+}
+
+function render(){
+  const list = filtered();
+  const tbody = $("#tbody");
+  tbody.innerHTML = "";
+  $("#empty").style.display = list.length ? "none" : "block";
+  $("#tbl").style.display = list.length ? "" : "none";
+
+  const now = Date.now();
+
+  if(state.groupDays){
+    let cur = null, frag = "";
+    // Para el toggle "solo pendientes" mostramos también el día en curso completo
+    for(const e of list){
+      const key = dk(new Date(e._ts));
+      if(key !== cur){
+        if(frag) tbody.insertAdjacentHTML("beforeend", frag);
+        cur = key;
+        const dayEvents = list.filter(x=>dk(new Date(x._ts))===key);
+        const hi = dayEvents.filter(x=>x.i===3).length;
+        const isToday = key === dk(new Date());
+        frag = `<tr class="day-row"><td colspan="8">${isToday?"📍 ":""}${esc(longDay(new Date(e._ts)))}<span class="cnt">${dayEvents.length} evento${dayEvents.length===1?"":"s"}${hi?` · ${hi} de alto impacto`:""}</span><span class="rel">${relativeLabel(dayEvents[0]._ts)}</span></td></tr>`;
+      }
+      frag += rowHTML(e, now);
+    }
+    if(frag) tbody.insertAdjacentHTML("beforeend", frag);
+  } else {
+    tbody.innerHTML = list.map(e=>rowHTML(e, now)).join("");
+  }
+
+  /* si había una fila abierta, se vuelve a abrir en su sitio */
+  if(detalleAbierto !== null){
+    const tr = document.querySelector(`tr.ev[data-id="${detalleAbierto}"]`);
+    if(tr) insertarDetalle(tr); else detalleAbierto = null;
+  }
+
+  renderSidebar(list);
+  renderChips();
+  const avisoVivo = (LIVE && LIVE.eventos && LIVE.eventos.length && state.fuente !== "curado")
+    ? `<div style="margin-bottom:7px;color:var(--good)"><b>🟢 Datos en vivo</b> · origen: ${esc(LIVE.origen||"feed público")} · actualizado ${esc(new Date(LIVE.actualizado).toLocaleString("es-ES"))}. Los títulos llegan en inglés y la semana se refresca sola. Cambia <b>Fuente</b> a «Sólo mi calendario» para ver los análisis en español con notas y fuentes.</div>`
+    : "";
+  $("#srcbar").innerHTML = avisoVivo + "Fuente principal: " + Object.values(SRC).map(s=>`<a href="${s.u}" target="_blank" rel="noopener">${esc(s.t)}</a>`).join(" · ") +
+    ` · ${list.length} de ${allEvents().length} eventos mostrados.`;
+}
+
+function rowHTML(e, now){
+  const past = e._ts < now - 60000;
+  const live = !e.allDay && e._ts <= now+60000 && e._ts >= now-15*60000;
+  const s = surprise(e);
+  const cls = ["ev", past?"past":"", live?"now":"", e.i===3?"hi":""].filter(Boolean).join(" ");
+  const kind = KIND[e.k]||KIND.data;
+  const timeCell = e.allDay
+    ? `<span class="t" style="color:var(--muted)">Todo el día</span>`
+    : `<span class="t">${hm(new Date(e._ts))}</span><span class="left">${relativeLabel(e._ts)}</span>`;
+  const leftCell = e.allDay
+    ? `<span style="color:var(--muted2)">—</span>`
+    : `<span class="${!past && e._ts-now < 3600000 ? "soon" : ""}">${leftText(e._ts)}</span>`;
+
+  const val = (v, showSurprise) => {
+    if(v===undefined||v===null||v==="") return `<span style="color:var(--muted2)">—</span>`;
+    let out = `<span class="v">${esc(v)}</span>`;
+    if(showSurprise && s) out += `<span class="d ${s.kind==="up"?"up":s.kind==="dn"?"dn":""}">${s.kind==="up"?"▲":s.kind==="dn"?"▼":"="} ${esc(s.txt)}</span>`;
+    return out;
+  };
+
+  return `<tr class="${cls}" data-id="${e._id}" data-i="${e.i}" tabindex="0">
+    <td class="col-time">${timeCell}</td>
+    <td class="col-cur">${curHTML(e.c)}</td>
+    <td class="col-imp">${impHTML(e.i)}</td>
+    <td class="col-ev"><div class="evname"><span class="tx">${esc(e.n)}</span>${e.own?`<span class="badge">propio</span>`:""}${e.k&&e.k!=="data"?`<span class="badge ${kind.cls}">${kind.l}</span>`:""}${e.approx?`<span class="badge" title="Hora orientativa">≈</span>`:""}</div>
+      ${state.showMap ? rxStrip(e) : ""}
+      ${(e.a||e.f||e.p)?`<div class="mini-vals">${e.a?`<b class="${s?s.kind:""}"><span class="lb">Act.</span>${esc(e.a)}${s?` ${s.kind==="up"?"▲":s.kind==="dn"?"▼":"="}${esc(s.txt)}`:""}</b>`:""}<span><span class="lb">Prev.</span>${esc(e.f||"—")}</span><span><span class="lb">Ant.</span>${esc(e.p||"—")}</span></div>`:""}</td>
+    <td class="col-val">${val(e.a, true)}</td>
+    <td class="col-val">${val(e.f, false)}</td>
+    <td class="col-val">${val(e.p, false)}</td>
+    <td class="col-left">${leftCell}</td>
+  </tr>`;
+}
+
+function detailHTML(e){
+  const s = surprise(e);
+  const src = SRC[e.src];
+  const tzName = activeTZ();
+  const sur = s ? `<span class="surprise ${s.kind}">${s.kind==="up"?"Mejor de lo previsto":s.kind==="dn"?"Peor de lo previsto":"En línea"} · ${esc(s.txt)}</span>` : `<span style="color:var(--muted2)">Sin dato publicado todavía</span>`;
+  return `<tr class="detail"><td colspan="8"><div class="detail-in">
+    <div><div class="k">Categoría</div><div class="v">${esc(e.t||"—")}${e.k?` · ${KIND[e.k]?KIND[e.k].l:e.k}`:""}</div></div>
+    <div><div class="k">Divisa</div><div class="v">${CUR[e.c]?CUR[e.c].f+" ":""}${esc(e.c)}${CUR[e.c]?" — "+esc(CUR[e.c].n):""}</div></div>
+    <div><div class="k">Hora (${esc(tzName)})</div><div class="v">${e.allDay?"Todo el día":esc(hm(new Date(e._ts)))+" · "+esc(tzAbbr(new Date(e._ts)))}</div></div>
+    <div><div class="k">Hora UTC</div><div class="v">${e.allDay?"—":esc(fmt(new Date(e._ts),{hour:"2-digit",minute:"2-digit",hour12:false},"UTC"))+" UTC"}</div></div>
+    <div><div class="k">Sorpresa frente a previsión</div><div class="v">${sur}</div></div>
+    <div><div class="k">Valores</div><div class="v">Actual <b>${esc(e.a||"—")}</b> · Previsión <b>${esc(e.f||"—")}</b> · Previo <b>${esc(e.p||"—")}</b></div></div>
+    ${e.note?`<div class="full"><div class="note">${esc(e.note)}</div></div>`:""}
+    ${state.showMap ? rxDetail(e) : ""}
+    <div class="full"><div class="k">Fuente</div><div class="v">${src?`<a href="${src.u}" target="_blank" rel="noopener">${esc(src.t)}</a>`:(e.own?"Evento añadido por ti (guardado en este navegador)":'<span style="color:var(--muted2)">Calendario consolidado</span>')}</div></div>
+    <div class="full" style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      <button class="btn primary" data-setactual="${esc(evKey(e))}">✎ Introducir el dato real</button>
+      <span style="font-size:11.5px;color:var(--muted2)">En cuanto lo escribas, la línea de dirección pasa sola a «ya salió · va a hacer» con el movimiento real de cada activo.</span>
+    </div>
+  </div></td></tr>`;
+}
+
+function renderChips(){
+  const used = [...new Set(allEvents().map(e=>e.c))];
+  const chips = $("#curchips");
+  if(!state.curs) state.curs = used.slice();
+  chips.innerHTML = used.map(c=>{
+    const on = state.curs.includes(c);
+    return `<button class="chip curchip ${on?"on":""}" data-cur="${c}">${CUR[c]?CUR[c].f:""} ${esc(c)}</button>`;
+  }).join("");
+}
+
+function renderSidebar(list){
+  /* --- próximo alto impacto --- */
+  const now = Date.now();
+  const upcoming = allEvents().filter(e=>!e.allDay && e._ts > now && state.imps.includes(e.i) && (!state.curs || state.curs.includes(e.c)));
+  const hi = upcoming.find(e=>e.i===3) || upcoming[0];
+  if(hi){
+    $("#cd-name").textContent = hi.n;
+    $("#cd-meta").textContent = `${CUR[hi.c]?CUR[hi.c].f+" ":""}${hi.c} · ${longDay(new Date(hi._ts))} · ${hm(new Date(hi._ts))}`;
+    $("#cd-imp").innerHTML = impHTML(hi.i);
+    $("#cd").dataset.ts = hi._ts;
+  } else {
+    $("#cd-name").textContent = "Sin eventos próximos";
+    $("#cd-meta").textContent = "No quedan eventos pendientes con los filtros actuales";
+    $("#cd-imp").innerHTML = "";
+    delete $("#cd").dataset.ts;
+  }
+
+  /* --- lista de próximos --- */
+  const next = upcoming.slice(0,12);
+  $("#nextcount").textContent = next.length ? next.length+" próximos" : "";
+  $("#nextlist").innerHTML = next.length ? next.map(e=>`
+    <div class="next-item" data-jump="${e._id}">
+      <div class="t">${hm(new Date(e._ts))}<div style="font-weight:400;color:var(--muted2)">${esc(dk(new Date(e._ts)).slice(5))}</div></div>
+      <div style="flex:1">
+        <div class="n">${CUR[e.c]?CUR[e.c].f+" ":""}${esc(e.n)}</div>
+        <div class="s">${esc(e.c)} · ${impHTML(e.i)} <span style="margin-left:6px">${relativeLabel(e._ts)}</span></div>
+      </div>
+    </div>`).join("") : `<div class="empty" style="padding:22px;font-size:12.5px">Nada pendiente</div>`;
+
+  /* --- estadísticas --- */
+  const byImp = {3:0,2:0,1:0};
+  list.forEach(e=>byImp[e.i]++);
+  const countries = [...new Set(list.map(e=>e.c))];
+  const pending = list.filter(e=>e._ts>now).length;
+  $("#stats").innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div class="k" style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700">Alto impacto</div><div style="font-size:22px;font-weight:800;color:var(--high)">${byImp[3]}</div></div>
+      <div><div class="k" style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700">Medio</div><div style="font-size:22px;font-weight:800;color:var(--med)">${byImp[2]}</div></div>
+      <div><div class="k" style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700">Bajo</div><div style="font-size:22px;font-weight:800;color:var(--low)">${byImp[1]}</div></div>
+      <div><div class="k" style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700">Pendientes</div><div style="font-size:22px;font-weight:800;color:var(--accent2)">${pending}</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted)">${list.length} eventos · ${countries.length} divisas (${countries.join(", ")})</div>`;
+}
+
+/* --- mini calendario --- */
+function renderMini(){
+  const base = state.month ? new Date(state.month+"-01T12:00:00Z") : new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12);
+  const y = base.getFullYear(), m = base.getMonth();
+  state.month = `${y}-${String(m+1).padStart(2,"0")}`;
+  $("#mlabel").textContent = fmt(new Date(Date.UTC(y,m,1,12)), {month:"long", year:"numeric"}, "UTC");
+  const first = new Date(Date.UTC(y,m,1,12));
+  const startDow = (first.getUTCDay()+6)%7; // lunes primero
+  const daysInMonth = new Date(Date.UTC(y,m+1,0)).getUTCDate();
+
+  const evs = allEvents();
+  const todayKey = dk(new Date());
+  let html = ["L","M","X","J","V","S","D"].map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let i=0;i<startDow;i++) html += `<div></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const key = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const dayEvs = evs.filter(e=>dk(new Date(e._ts))===key && state.imps.includes(e.i) && (!state.curs||state.curs.includes(e.c)));
+    const h = dayEvs.some(e=>e.i===3), md = dayEvs.some(e=>e.i===2), lo = dayEvs.some(e=>e.i===1);
+    const cls = ["mini-day", dayEvs.length?"has":"", key===todayKey?"today":"", state.day===key?"sel":""].filter(Boolean).join(" ");
+    html += `<button class="${cls}" data-day="${key}" title="${dayEvs.length} evento(s)">${d}${dayEvs.length?`<span class="dots">${h?'<i class="dot-h"></i>':""}${md?'<i class="dot-m"></i>':""}${lo&&!h&&!md?'<i class="dot-l"></i>':""}</span>`:""}</button>`;
+  }
+  $("#mgrid").innerHTML = html;
+}
+
+/* ==========================================================================
+   5. INTERACCIÓN
+   ========================================================================== */
+function saveState(){
+  LS.set("range",state.range); LS.set("imps",state.imps); LS.set("curs",state.curs);
+  LS.set("onlyUpcoming",state.onlyUpcoming); LS.set("groupDays",state.groupDays);
+  LS.set("tz",state.tz); LS.set("theme",state.theme); LS.set("showMap",state.showMap); LS.set("rxBase",state.rxBase); LS.set("fuente",state.fuente);
+}
+
+$("#tabs").addEventListener("click", ev=>{
+  const b = ev.target.closest(".tab"); if(!b) return;
+  state.range = b.dataset.range; state.day = null;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t===b));
+  render(); renderMini(); saveState();
+});
+document.querySelectorAll("[data-imp]").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const v = +btn.dataset.imp;
+    if(state.imps.includes(v)) state.imps = state.imps.filter(x=>x!==v);
+    else state.imps = [...state.imps, v].sort();
+    btn.classList.toggle("on", state.imps.includes(v));
+    render(); renderMini(); saveState();
+  });
+});
+$("#curchips").addEventListener("click", ev=>{
+  const b = ev.target.closest("[data-cur]"); if(!b) return;
+  const c = b.dataset.cur;
+  state.curs = state.curs.includes(c) ? state.curs.filter(x=>x!==c) : [...state.curs, c];
+  render(); renderMini(); saveState();
+});
+$("#allcur").onclick = ()=>{ state.curs = [...new Set(allEvents().map(e=>e.c))]; render(); renderMini(); saveState(); };
+$("#nonecur").onclick = ()=>{ state.curs = []; render(); renderMini(); saveState(); };
+$("#q").addEventListener("input", e=>{ state.q = e.target.value; render(); });
+$("#onlyup").addEventListener("change", e=>{ state.onlyUpcoming = e.target.checked; render(); saveState(); });
+$("#groupdays").addEventListener("change", e=>{ state.groupDays = e.target.checked; render(); saveState(); });
+$("#tz").addEventListener("change", e=>{ state.tz = e.target.value; render(); renderMini(); saveState(); });
+$("#theme").addEventListener("click", ()=>{
+  state.theme = state.theme==="dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = state.theme;
+  $("#theme").textContent = state.theme==="dark" ? "🌙" : "☀️";
+  saveState();
+});
+$("#reset").onclick = ()=>{
+  state.imps=[1,2,3]; state.curs=[...new Set(allEvents().map(e=>e.c))]; state.q="";
+  state.onlyUpcoming = false; state.day=null; state.range="all";
+  $("#q").value=""; $("#onlyup").checked=false;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.range==="all"));
+  document.querySelectorAll("[data-imp]").forEach(b=>b.classList.add("on"));
+  render(); renderMini(); saveState();
+};
+$("#fuente").addEventListener("change", e=>{
+  state.fuente = e.target.value; saveState();
+  render(); renderMini();
+});
+$("#refreshlive").addEventListener("click", ()=>{ cargarVivo(); });
+$("#rxhelp").onclick = ()=> $("#rxmodal").classList.add("open");
+$("#rxclose").onclick = ()=> $("#rxmodal").classList.remove("open");
+$("#rxmodal").addEventListener("click", e=>{ if(e.target.id==="rxmodal") $("#rxmodal").classList.remove("open"); });
+$("#mprev").onclick = ()=>{ const [y,m]=state.month.split("-").map(Number); const d=new Date(Date.UTC(y,m-2,1,12)); state.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`; renderMini(); };
+$("#mnext").onclick = ()=>{ const [y,m]=state.month.split("-").map(Number); const d=new Date(Date.UTC(y,m,1,12)); state.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`; renderMini(); };
+$("#mgrid").addEventListener("click", ev=>{
+  const b = ev.target.closest("[data-day]"); if(!b) return;
+  state.day = state.day===b.dataset.day ? null : b.dataset.day;
+  render(); renderMini();
+});
+$("#nextlist").addEventListener("click", ev=>{
+  const it = ev.target.closest("[data-jump]"); if(!it) return;
+  const id = +it.dataset.jump;
+  state.range="all"; state.day=null;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.range==="all"));
+  render();
+  const row = document.querySelector(`tr.ev[data-id="${id}"]`);
+  if(row){ row.scrollIntoView({behavior:"smooth", block:"center"}); row.click(); }
+});
+
+/* --- expandir detalle --- */
+function insertarDetalle(tr){
+  const e = allEvents().find(x=>x._id === +tr.dataset.id);
+  if(!e) return;
+  tr.insertAdjacentHTML("afterend", detailHTML(e));
+  detalleAbierto = +tr.dataset.id;
+}
+$("#tbody").addEventListener("click", ev=>{
+  const tr = ev.target.closest("tr.ev"); if(!tr) return;
+  const next = tr.nextElementSibling;
+  if(next && next.classList.contains("detail")){ next.remove(); detalleAbierto = null; return; }
+  document.querySelectorAll("tr.detail").forEach(d=>d.remove());
+  insertarDetalle(tr);
+});
+$("#tbody").addEventListener("click", ev=>{
+  const b = ev.target.closest("[data-setactual]"); if(!b) return;
+  ev.stopPropagation();
+  const key = b.dataset.setactual;
+  const A = LS.get("actuals",{});
+  const v = prompt("Valor real publicado (vacío para borrarlo):", A[key] || "");
+  if(v === null) return;
+  if(v.trim() === "") delete A[key]; else A[key] = v.trim();
+  LS.set("actuals", A);
+  const id = ev.target.closest("tr.detail").previousElementSibling?.dataset.id;
+  render();
+  if(id) document.querySelector(`tr.ev[data-id="${id}"]`)?.click();
+});
+$("#tbody").addEventListener("keydown", ev=>{
+  if(ev.key==="Enter" || ev.key===" "){ const tr = ev.target.closest("tr.ev"); if(tr){ ev.preventDefault(); tr.click(); } }
+});
+
+/* --- modal añadir evento --- */
+function openModal(){
+  $("#cursel").innerHTML = Object.keys(CUR).concat(["OTRA"]).map(c=>`<option value="${c}">${CUR[c]?CUR[c].f+" ":""}${c}</option>`).join("");
+  const d = new Date(Date.now()+86400000);
+  d.setMinutes(0,0,0);
+  $("#addform").d.value = new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  $("#modal").classList.add("open");
+}
+$("#addbtn").onclick = openModal;
+$("#mclose").onclick = $("#mcancel").onclick = ()=> $("#modal").classList.remove("open");
+$("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") $("#modal").classList.remove("open"); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("#modal").classList.remove("open"); $("#rxmodal").classList.remove("open"); } });
+$("#addform").addEventListener("submit", ev=>{
+  ev.preventDefault();
+  const f = ev.target;
+  const item = {
+    d: new Date(f.d.value).toISOString(),
+    c: f.c.value === "OTRA" ? "OTRA" : f.c.value,
+    n: f.n.value.trim(), i: +f.i.value, t: f.t.value,
+    a: f.a.value.trim(), f: f.f.value.trim(), p: f.p.value.trim(), note: f.note.value.trim()
+  };
+  const arr = LS.get("extra",[]); arr.push(item); LS.set("extra", arr);
+  f.reset(); $("#modal").classList.remove("open");
+  if(!state.curs.includes(item.c)) state.curs.push(item.c);
+  state.range="all"; state.onlyUpcoming=false; $("#onlyup").checked=false;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.range==="all"));
+  render(); renderMini();
+});
+
+/* --- exportaciones --- */
+function download(name, text, type){
+  const blob = new Blob([text], {type:type||"text/plain;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+}
+$("#csvbtn").onclick = ()=>{
+  const rows = [["fecha_utc","hora_utc","divisa","impacto","evento","actual","prevision","previo","categoria",
+    "escenario_al_alza","EURUSD","USD_DXY","SP500_ES","NASDAQ_NQ","ORO_GC","escenario_a_la_baja","EURUSD_2","USD_DXY_2","SP500_ES_2","NASDAQ_NQ_2","ORO_GC_2","perfil","notas","fuente"]];
+  filtered().forEach(e=>{
+    const prof = profileOf(e), P = PROFILE[prof];
+    const U = (prof==="festivo"||prof==="informe") ? {} : assetMap(e,+1);
+    const D = (prof==="festivo"||prof==="informe") ? {} : assetMap(e,-1);
+    const A = v => v===undefined ? "" : arrowOf(v).s;
+    const T = v => v===undefined ? "" : arrowOf(v).t;
+    rows.push([
+      e.allDay?"":new Date(e._ts).toISOString().slice(0,10),
+      e.allDay?"Todo el día":new Date(e._ts).toISOString().slice(11,16),
+      e.c, e.i===3?"Alto":e.i===2?"Medio":"Bajo", e.n, e.a||"", e.f||"", e.p||"", e.t||"",
+      P.up, A(U.EURUSD), A(U.DXY), A(U.ES), A(U.NQ), A(U.GC),
+      P.dn, A(D.EURUSD), A(D.DXY), A(D.ES), A(D.NQ), A(D.GC),
+      prof, e.note||"", e.src&&SRC[e.src]?SRC[e.src].u:""
+    ]);
+  });
+  download("calendario-economico.csv", "\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n"), "text/csv;charset=utf-8");
+};
+$("#jsonbtn").onclick = ()=> download("calendario-economico.json", JSON.stringify(filtered().map(({_id,_ts,...r})=>r), null, 2), "application/json");
+$("#backupbtn").onclick = ()=>{
+  const pack = { app:"calendario-economico", v:1, fecha:new Date().toISOString(),
+    extra: LS.get("extra",[]), actuals: LS.get("actuals",{}),
+    ajustes: {range:state.range, imps:state.imps, curs:state.curs, tz:state.tz, theme:state.theme, onlyUpcoming:state.onlyUpcoming} };
+  download("calendario-copia.json", JSON.stringify(pack,null,2), "application/json");
+};
+$("#restorebtn").onclick = ()=> $("#restorefile").click();
+$("#restorefile").addEventListener("change", ev=>{
+  const f = ev.target.files && ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || (d.app !== "calendario-economico" && !d.extra && !d.actuals)) throw new Error("formato");
+      if(Array.isArray(d.extra)) LS.set("extra", d.extra);
+      if(d.actuals && typeof d.actuals === "object") LS.set("actuals", d.actuals);
+      if(d.ajustes){
+        if(d.ajustes.tz) state.tz = d.ajustes.tz;
+        if(Array.isArray(d.ajustes.imps) && d.ajustes.imps.length) state.imps = d.ajustes.imps;
+        if(d.ajustes.theme) state.theme = d.ajustes.theme;
+        if(d.ajustes.curs) state.curs = d.ajustes.curs;
+      }
+      alert("Copia restaurada: " + (d.extra?d.extra.length:0) + " eventos propios y " +
+            Object.keys(d.actuals||{}).length + " datos reales.");
+      location.reload();
+    }catch(err){ alert("No se pudo leer la copia: " + err.message); }
+  };
+  r.readAsText(f);
+  ev.target.value = "";
+});
+$("#printbtn").onclick = ()=> window.print();
+
+/* --- reloj y cuenta atrás --- */
+function tick(){
+  const now = new Date();
+  $("#clock").textContent = fmt(now,{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  $("#clockzone").textContent = activeTZ().replace("_"," ") + " · " + tzAbbr(now);
+  const cd = $("#cd");
+  if(cd.dataset.ts){
+    let diff = +cd.dataset.ts - Date.now();
+    if(diff < 0){
+      render();
+      return;
+    }
+    const d = Math.floor(diff/86400000), h = Math.floor(diff%86400000/3600000),
+          m = Math.floor(diff%3600000/60000), s = Math.floor(diff%60000/1000);
+    const p = n=>String(n).padStart(2,"0");
+    $("#cd-timer").textContent = (d>0 ? d+"d " : "") + p(h)+":"+p(m)+":"+p(s);
+    $("#cd-timer").classList.toggle("soon", diff < 3600000);
+  } else { $("#cd-timer").textContent = "--:--:--"; }
+}
+
+/* --- init --- */
+function syncSticky(){
+  const tb = document.querySelector(".topbar");
+  if(tb) document.documentElement.style.setProperty("--thead-top", tb.offsetHeight + "px");
+}
+
+/* Permite compartir enlaces con el estado: #range=week&imp=3&tz=Europe/Madrid&theme=light */
+function applyHash(){
+  const h = location.hash.replace(/^#/,"");
+  if(!h) return;
+  const q = new URLSearchParams(h);
+  if(q.get("theme")) state.theme = q.get("theme");
+  if(q.get("range")) state.range = q.get("range");
+  if(q.get("tz")) state.tz = q.get("tz");
+  if(q.get("imp")){ const v=q.get("imp").split(",").map(Number).filter(i=>[1,2,3].includes(i)); if(v.length) state.imps=v; }
+  if(q.get("cur")) state.curs = q.get("cur").split(",").map(x=>x.trim().toUpperCase());
+  if(q.get("q")) state.q = q.get("q");
+  if(q.get("upcoming")!==null) state.onlyUpcoming = q.get("upcoming")!=="0";
+  if(q.get("grouptoggle")==="1") state.groupDays = true;
+}
+
+function init(){
+  applyHash();
+  document.documentElement.dataset.theme = state.theme;
+  $("#theme").textContent = state.theme==="dark" ? "🌙" : "☀️";
+  $("#tz").innerHTML = TZ.map(t=>`<option value="${t.v}">${t.l}</option>`).join("");
+  $("#tz").value = state.tz;
+  state.curs = state.curs || [...new Set(allEvents().map(e=>e.c))];
+  state.curs = state.curs.filter(c=>allEvents().some(e=>e.c===c));
+  state.imps = state.imps.filter(i=>[1,2,3].includes(i));
+  if(!state.imps.length) state.imps=[1,2,3];
+  document.querySelectorAll("[data-imp]").forEach(b=> b.classList.toggle("on", state.imps.includes(+b.dataset.imp)));
+  $("#onlyup").checked = state.onlyUpcoming;
+  $("#groupdays").checked = state.groupDays;
+  $("#q").value = state.q || "";
+  $("#fuente").value = state.fuente;
+  pintarChip(!!(LIVE && LIVE.eventos && LIVE.eventos.length));
+  cargarVivo(true);
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.range===state.range));
+
+  const nextHi = allEvents().find(e=>e.i===3 && e._ts > Date.now());
+  if(nextHi) state.month = dk(new Date(nextHi._ts)).slice(0,7);
+
+  renderMini(); render(); tick();
+  setInterval(tick, 1000);
+  setInterval(autoRefresco, INTERVALO_REFRESCO);
+  setInterval(()=>{ if(!state.day) { render(); renderMini(); } }, 60000);
+  window.addEventListener("resize", syncSticky);
+  syncSticky();
+  setTimeout(syncSticky, 400);
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+CALENDARIO ECONÓMICO MACRO — paquete listo para publicar
+=========================================================
+
+Qué hay en esta carpeta
+-----------------------
+  index.html            La aplicación (todo va dentro, no necesita internet).
+  manifest.webmanifest  Metadatos para instalarla en el móvil como una app.
+  sw.js                 Service worker: una vez cargada, funciona sin conexión.
+  icon-192.png          Icono para Android / escritorio.
+  icon-512.png          Icono grande.
+  apple-touch-icon.png  Icono para iPhone/iPad.
+  favicon.ico           Icono de la pestaña del navegador.
+  _headers              Reglas de caché (sólo Netlify / Cloudflare; se ignora en GitHub).
+  .nojekyll             Necesario en GitHub Pages para que sirva todo tal cual.
+  LEEME.txt             Este archivo.
+
+IMPORTANTE: sube el CONTENIDO de esta carpeta, no la carpeta con un nivel
+de más. El archivo index.html tiene que quedar en la RAÍZ del sitio.
+
+
+=========================================================
+OPCIÓN A — NETLIFY DROP  (la más fácil: 30 segundos, sin cuenta)
+=========================================================
+  1. Abre  https://app.netlify.com/drop
+  2. Arrastra el CONTENIDO de esta carpeta (o la carpeta entera) a la zona
+     de "drag & drop".
+  3. En segundos te da una dirección tipo  https://algo-random.netlify.app
+     Ya funciona, con HTTPS.
+  4. Si creas una cuenta gratuita, conservas el sitio y le cambias el nombre.
+  Para actualizar: vuelve a arrastrar el contenido encima del sitio.
+
+
+=========================================================
+OPCIÓN B — GITHUB PAGES SIN USAR EL TERMINAL  (recomendado si quieres GitHub)
+=========================================================
+  1. Crea un repositorio PÚBLICO en  https://github.com/new
+     Nombre: calendario-macro    |    NO marques "Add a README".
+     Pulsa "Create repository".
+  2. En la página del repositorio vacío verás un enlace que dice
+     "uploading an existing file". Púlsalo.
+     (También vale: https://github.com/TUUSUARIO/calendario-macro/upload/main)
+  3. Abre esta carpeta en el Finder y SELECCIONA TODOS LOS ARCHIVOS
+     (Cmd + A) y arrástralos a la zona de subida del navegador.
+     Ojo: selecciona los archivos, NO la carpeta contenedora.
+  4. Abajo pulsa "Commit changes".
+  5. En el repositorio:  Settings > Pages
+        Source: Deploy from a branch
+        Branch: main   /   carpeta: / (root)   >  Save
+  6. Espera 1-2 minutos. Tu calendario estará en:
+        https://TUUSUARIO.github.io/calendario-macro/
+  Para actualizar: repite los pasos 2-4 subiendo los archivos nuevos.
+
+
+=========================================================
+OPCIÓN B2 — GITHUB PAGES USANDO EL TERMINAL
+=========================================================
+  Sólo si te manejas con la Terminal. Necesitarás un token de GitHub
+  (GitHub ya no acepta la contraseña de la cuenta para subir código):
+    1. https://github.com/settings/tokens  >  Generate new token (classic)
+       Marca el permiso "repo" y genera el token. Cópialo.
+    2. En la Terminal:
+
+         cd "RUTA/DE/ESTA/CARPETA"
+         git init
+         git add .
+         git commit -m "Calendario economico"
+         git branch -M main
+         git remote add origin https://github.com/TUUSUARIO/calendario-macro.git
+         git push -u origin main
+
+       Cuando pida usuario: tu nombre de usuario de GitHub.
+       Cuando pida contraseña: PEGA EL TOKEN (no verás nada al pegarlo, es normal).
+    3. Activa Pages como en el paso 5 de la opción B.
+
+
+=========================================================
+OPCIÓN C — CLOUDFLARE PAGES
+=========================================================
+  1. https://pages.cloudflare.com  >  cuenta gratuita.
+  2. "Upload assets" y sube el contenido de esta carpeta.
+  3. Te da una URL  https://algo.pages.dev
+
+
+=========================================================
+OPCIÓN D — SÓLO EN TU RED LOCAL (sin publicar en internet)
+=========================================================
+  En la Terminal, dentro de esta carpeta:
+        python3 -m http.server 8000
+  Y desde el móvil, en la misma wifi:
+        http://IP-DEL-ORDENADOR:8000
+  (La IP la ves con:  ipconfig getifaddr en0 )
+
+
+=========================================================
+INSTALARLA EN EL MÓVIL COMO SI FUERA UNA APP
+=========================================================
+  iPhone/iPad (Safari):  Compartir  >  "Añadir a pantalla de inicio"
+  Android (Chrome):      menú de tres puntos  >  "Instalar aplicación"
+  Se abre a pantalla completa y funciona sin conexión.
+
+
+=========================================================
+SOBRE TUS DATOS
+=========================================================
+  Lo que guardas (tus eventos propios, los datos reales que introduces con el
+  botón "Introducir el dato real" y los filtros) se guarda en el navegador DE
+  CADA DISPOSITIVO, no en el servidor. El servidor sólo entrega la aplicación,
+  que es estática y no almacena nada.
+
+  Para pasar tus datos de un dispositivo a otro usa los botones de la barra:
+    Copia      -> descarga un archivo calendario-copia.json
+    Restaurar  -> en el otro dispositivo, carga ese archivo
+
+Requisitos: ninguno. Es un sitio estático: no necesita base de datos,
+ni PHP, ni Node en el servidor. Cualquier hosting estático sirve.

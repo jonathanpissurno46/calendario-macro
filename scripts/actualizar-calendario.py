@@ -7,7 +7,8 @@ Actualiza datos.json para el Calendario Economico Macro.
      los valores reales publicados (actual), la prevision y el dato previo.
      No necesita ninguna clave ni registro.
      - La semana en curso se pide en cada ejecucion (datos al minuto).
-     - El tramo futuro (DIAS_FUTURO dias) se pide una vez al dia y se guarda.
+     - El historico (DIAS_PASADO dias) y el futuro (DIAS_FUTURO dias) se piden
+       una vez al dia y se guardan, para no castigar al servicio gratuito.
   2. Si TradingView fallara, usa el feed publico de ForexFactory como respaldo
      (en ese caso no habria valores reales, solo previsiones).
   3. Escribe datos.json en la raiz del repositorio.
@@ -32,11 +33,13 @@ UA = "Mozilla/5.0 (compatible; CalendarioMacro/1.0)"
 # el calendario queda limpio y sin subastas ni indices menores.
 IMPORTANCIA_MINIMA = 0
 
-# Cuantos dias hacia delante se muestran ademas de la semana en curso.
-# El tramo futuro se refresca una vez al dia; la semana actual cada 10 minutos.
+# Cuantos dias de historico y de futuro se muestran, ademas de la semana en
+# curso. La semana actual se refresca cada 10 minutos; los tramos pasado y
+# futuro se descargan una vez al dia y se reutilizan el resto del tiempo.
+DIAS_PASADO = 28
 DIAS_FUTURO = 28
-# Horas que pueden pasar antes de volver a pedir el tramo futuro
-HORAS_CADUCIDAD_FUTURO = 20
+# Horas que pueden pasar antes de volver a pedir un tramo
+HORAS_CADUCIDAD = 20
 
 
 def bajar_json(url, cabeceras=None):
@@ -178,6 +181,48 @@ def fecha_de(evento):
     return str(evento.get("date", ""))[:10]
 
 
+def tramo(nombre, desde, hasta, modo, guardados, sello, ahora, sello_ahora):
+    """Descarga un tramo de fechas, o reutiliza el guardado si aun sirve.
+
+    modo = "pasado" (interesa que llegue lo mas atras posible)
+           "futuro" (interesa que llegue lo mas adelante posible)
+    Devuelve (eventos, sello_nuevo, aviso).
+    """
+    relevantes = [e for e in guardados if desde.isoformat() <= fecha_de(e) <= hasta.isoformat()]
+
+    cubre = False
+    if relevantes:
+        fechas = [fecha_de(e) for e in relevantes]
+        if modo == "pasado":
+            cubre = min(fechas) <= (desde + timedelta(days=5)).isoformat()
+        else:
+            cubre = max(fechas) >= (hasta - timedelta(days=5)).isoformat()
+
+    caducado = True
+    if sello:
+        try:
+            caducado = (ahora - datetime.fromisoformat(str(sello).replace("Z", "+00:00"))).total_seconds() \
+                       > HORAS_CADUCIDAD * 3600
+        except Exception:                             # noqa: BLE001
+            caducado = True
+
+    if not caducado and cubre:
+        print("Tramo %s reutilizado: %d eventos (%s a %s)." % (nombre, len(relevantes),
+              desde.isoformat(), hasta.isoformat()))
+        return relevantes, sello, ""
+
+    try:
+        nuevos = eventos_tradingview(desde.isoformat(), hasta.isoformat())
+    except Exception as err:                          # noqa: BLE001
+        print("AVISO: no se pudo refrescar el tramo %s (%s)." % (nombre, err))
+        print("       Se conservan los %d eventos ya guardados de ese tramo." % len(relevantes))
+        return relevantes, (sello or sello_ahora), str(err)
+
+    print("Tramo %s descargado: %d eventos (%s a %s)." % (nombre, len(nuevos),
+          desde.isoformat(), hasta.isoformat()))
+    return nuevos, sello_ahora, ""
+
+
 def main():
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     destino = os.path.join(raiz, "datos.json")
@@ -185,6 +230,7 @@ def main():
     ahora = datetime.now(timezone.utc)
     lunes = ahora.date() - timedelta(days=ahora.weekday())
     domingo = lunes + timedelta(days=6)
+    inicio_pasado = lunes - timedelta(days=DIAS_PASADO)
     fin_futuro = lunes + timedelta(days=DIAS_FUTURO)
     sello_ahora = ahora.isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -212,36 +258,16 @@ def main():
             print("       No se toca datos.json: los datos anteriores siguen intactos.")
             return 1
 
-    # ---- 2. Tramo futuro: se reaprovecha y se refresca como mucho una vez al dia ----
-    futuros = [e for e in guardados
-               if domingo.isoformat() < fecha_de(e) <= fin_futuro.isoformat()]
-    alcanza = bool(futuros) and max(fecha_de(e) for e in futuros) >= (fin_futuro - timedelta(days=5)).isoformat()
-    sello_futuro = anterior.get("futuroActualizado")
-    caducado = True
-    if sello_futuro:
-        try:
-            caducado = (ahora - datetime.fromisoformat(str(sello_futuro).replace("Z", "+00:00"))).total_seconds() \
-                       > HORAS_CADUCIDAD_FUTURO * 3600
-        except Exception:                             # noqa: BLE001
-            caducado = True
+    # ---- 2. Historico y futuro: se refrescan como mucho una vez al dia ----
+    pasados, sello_pasado, aviso_pasado = tramo(
+        "pasado", inicio_pasado, lunes - timedelta(days=1), "pasado",
+        guardados, anterior.get("pasadoActualizado"), ahora, sello_ahora)
 
-    aviso_futuro = ""
-    if caducado or not alcanza:
-        try:
-            largos = eventos_tradingview((domingo + timedelta(days=1)).isoformat(), fin_futuro.isoformat())
-            print("Tramo futuro refrescado: %d eventos (hasta %s)." % (len(largos), fin_futuro.isoformat()))
-        except Exception as err:                      # noqa: BLE001
-            largos, sello_futuro = futuros, sello_futuro or sello_ahora
-            aviso_futuro = str(err)
-            print("AVISO: no se pudo refrescar el tramo futuro (%s)." % err)
-            print("       Se conservan los %d eventos futuros ya guardados." % len(futuros))
-        else:
-            sello_futuro = sello_ahora
-    else:
-        largos = futuros
-        print("Tramo futuro reutilizado de la ejecucion anterior: %d eventos." % len(largos))
+    largos, sello_futuro, aviso_futuro = tramo(
+        "futuro", domingo + timedelta(days=1), fin_futuro, "futuro",
+        guardados, anterior.get("futuroActualizado"), ahora, sello_ahora)
 
-    base = base + largos
+    base = base + largos + pasados
     base.sort(key=lambda e: str(e.get("date", "")))
     con_real = sum(1 for e in base if e.get("actual"))
     print("Eventos con valor real publicado: %d de %d." % (con_real, len(base)))
@@ -249,13 +275,16 @@ def main():
     paquete = {
         "origen": origen,
         "conValoresReales": con_real,
+        "pasadoActualizado": sello_pasado,
         "futuroActualizado": sello_futuro,
         "diagnostico": {
             "fuente": "TradingView" if origen.startswith("TradingView") else "ForexFactory",
             "eventos": len(base),
             "conValorReal": con_real,
-            "rango": lunes.isoformat() + " a " + fin_futuro.isoformat(),
+            "rango": inicio_pasado.isoformat() + " a " + fin_futuro.isoformat(),
+            "semanaEnCurso": lunes.isoformat() + " a " + domingo.isoformat(),
             "avisoTradingView": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", error_tv)[:200] if error_tv else "",
+            "avisoPasado": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", aviso_pasado)[:200] if aviso_pasado else "",
             "avisoFuturo": re.sub(r"[A-Za-z0-9_\-]{18,}", "***", aviso_futuro)[:200] if aviso_futuro else "",
         },
         "eventos": base,
